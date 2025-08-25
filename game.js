@@ -3693,6 +3693,11 @@ class Player {
 			this.velY = -8; // Small death jump
 			if (game.soundManager) game.soundManager.play('gameOver');
 			
+			// Update lives in recharge manager
+			if (window.rechargeManager) {
+				window.rechargeManager.updateLivesRemaining(0);
+			}
+			
 			// Show game over screen
 			if (window.game && window.game.showGameOver) {
 				window.game.showGameOver();
@@ -3702,6 +3707,12 @@ class Player {
 		} else {
 			// Respawn immediately with remaining lives
 			console.log(`=== RESPAWNING - ${this.lives} LIVES LEFT ===`);
+			
+			// Update lives in recharge manager
+			if (window.rechargeManager) {
+				window.rechargeManager.updateLivesRemaining(this.lives);
+			}
+			
 			this.respawn();
 		}
 	}
