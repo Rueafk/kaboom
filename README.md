@@ -2,11 +2,6 @@
 
 A modern web3-enabled game with real-time player data, recharge system, and comprehensive admin dashboard.
 
-## 🚀 Live Demo
-
-**Game:** [https://kaboom-game-server.onrender.com](https://kaboom-game-server.onrender.com)  
-**Admin Dashboard:** [https://kaboom-game-server.onrender.com/admin-dashboard.html](https://kaboom-game-server.onrender.com/admin-dashboard.html)
-
 ## ✨ Features
 
 ### 🎮 Player Features
@@ -68,28 +63,17 @@ npm run dev
 open http://localhost:3000
 ```
 
-## 🚀 Deployment
-
-### Quick Deploy to Render
-
-1. **Fork/Clone this repository**
-2. **Create Render account** at [render.com](https://render.com)
-3. **Connect GitHub repository**
-4. **Deploy automatically** - Follow [RENDER_DEPLOYMENT.md](RENDER_DEPLOYMENT.md)
-
-### Manual Deployment
+## 🚀 Local Development
 
 ```bash
-# Prepare for deployment
-./deploy-setup.sh
+# Install dependencies
+npm install
 
-# Push to GitHub
-git add .
-git commit -m "Ready for deployment"
-git push origin main
+# Start development server
+npm run dev
 
-# Deploy to Render
-# Follow RENDER_DEPLOYMENT.md for detailed steps
+# Open in browser
+open http://localhost:3000
 ```
 
 ## 🔧 Configuration
@@ -97,18 +81,8 @@ git push origin main
 ### Environment Variables
 
 ```bash
-NODE_ENV=production
-PORT=10000
-```
-
-### CORS Settings
-
-Update `server.js` with your Render URL:
-
-```javascript
-const allowedOrigins = NODE_ENV === 'production' 
-    ? ['https://your-app-name.onrender.com']
-    : ['http://localhost:3000'];
+NODE_ENV=development
+PORT=3000
 ```
 
 ## 📊 API Endpoints
@@ -183,7 +157,6 @@ npm install        # Install dependencies
 ├── game.js                # Game logic
 ├── web3/                  # Web3 integration
 ├── admin-dashboard.html   # Admin panel
-├── render.yaml            # Render deployment config
 └── README.md             # This file
 ```
 
@@ -191,21 +164,20 @@ npm install        # Install dependencies
 
 ### Common Issues
 
-1. **CORS Errors**
-   - Update allowed origins in `server.js`
-   - Check your Render URL
+1. **Server won't start**
+   - Check if port 3000 is available
+   - Ensure Node.js 16+ is installed
 
 2. **Database Issues**
-   - SQLite should work on Render
-   - Check logs for database errors
+   - Check if database file is created
+   - Monitor logs for database errors
 
-3. **Build Fails**
-   - Ensure Node.js 16+
-   - Check `package.json` scripts
+3. **CORS Errors**
+   - Check browser console for errors
+   - Verify localhost URLs
 
 ### Getting Help
 
-- **Render Docs:** https://render.com/docs
 - **GitHub Issues:** Report bugs and feature requests
 - **Discord:** Join our community
 
@@ -226,7 +198,6 @@ MIT License - see [LICENSE](LICENSE) file for details.
 - **Solana Web3.js** - Blockchain integration
 - **Express.js** - Backend framework
 - **SQLite** - Database solution
-- **Render** - Hosting platform
 
 ---
 

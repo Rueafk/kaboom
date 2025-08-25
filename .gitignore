@@ -61,7 +61,7 @@ jspm_packages/
 ehthumbs.db
 Thumbs.db
 
-# Database files (keep for development, but be aware of persistence)
+# Database files
 *.db
 *.sqlite
 *.sqlite3
@@ -69,14 +69,6 @@ Thumbs.db
 # Temporary files
 tmp/
 temp/
-
-# Build outputs
-dist/
-build/
-
-# Test files
-test-results/
-coverage/
 
 # Backup files
 *.bak
