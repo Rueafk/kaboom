@@ -37,6 +37,40 @@ class AssetLoader {
 		});
 	}
 
+	// Create fallback sprites for failed animations
+	createFallbackSpritesForAnimation(animName, frameCount) {
+		const frames = [];
+		for (let i = 0; i < frameCount; i++) {
+			const canvas = document.createElement('canvas');
+			canvas.width = 64;
+			canvas.height = 64;
+			const ctx = canvas.getContext('2d');
+			
+			// Create different colored fallback sprites based on animation
+			let color = '#ff0000'; // Default red
+			if (animName === '1-Idle') color = '#00ff00'; // Green for idle
+			else if (animName === '2-Run') color = '#0000ff'; // Blue for run
+			else if (animName === '4-Jump') color = '#ffff00'; // Yellow for jump
+			else if (animName === '5-Fall') color = '#ff00ff'; // Magenta for fall
+			else if (animName === '7-Hit') color = '#ff8800'; // Orange for hit
+			
+			ctx.fillStyle = color;
+			ctx.fillRect(0, 0, 64, 64);
+			
+			// Add animation name for debugging
+			ctx.fillStyle = '#ffffff';
+			ctx.font = '8px Arial';
+			ctx.fillText(animName, 2, 12);
+			ctx.fillText(`${i + 1}/${frameCount}`, 2, 24);
+			
+			// Convert canvas to image
+			const img = new Image();
+			img.src = canvas.toDataURL();
+			frames.push(img);
+		}
+		return frames;
+	}
+
 	// Player manifest
 	getPlayerManifest() {
 		const base = 'Sprites/1-Player-Bomb Guy';
@@ -186,16 +220,18 @@ class AssetLoader {
 						console.log(`Loading player animation: ${anim} with ${playerManifest[anim]} frames from ${playerManifest._base}/${anim}`);
 						const frames = await Promise.race([
 							this.loadFrames(`${playerManifest._base}/${anim}`, playerManifest[anim]),
-							new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout')), 3000))
+							new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout')), 10000)) // Increased timeout to 10 seconds
 						]);
 						console.log(`Successfully loaded ${anim}: ${frames.length} frames`);
 						this.assets.player[anim] = frames;
 					} catch (error) {
 						console.warn(`Failed to load player animation ${anim}:`, error);
-						this.assets.player[anim] = [];
+						// Create fallback sprites for failed animations
+						this.assets.player[anim] = this.createFallbackSpritesForAnimation(anim, playerManifest[anim]);
 					}
 				} else {
 					console.warn(`Player animation ${anim} not found in manifest`);
+					this.assets.player[anim] = [];
 				}
 				addProgress(totalSteps);
 			}
@@ -3709,8 +3745,41 @@ class Player {
 		
 		if (frames.length === 0) { 
 			console.warn(`No frames for animation: ${this.anim.name}. Available sprites:`, Object.keys(this.sprites));
-			// Draw a visible player fallback
-			ctx.fillStyle = '#ff0000'; // Red for player
+			
+			// Try to find any available animation as fallback
+			const availableAnims = Object.keys(this.sprites);
+			if (availableAnims.length > 0) {
+				const fallbackAnim = availableAnims[0];
+				const fallbackFrames = this.sprites[fallbackAnim];
+				if (fallbackFrames && fallbackFrames.length > 0) {
+					console.log(`Using fallback animation: ${fallbackAnim} for ${this.anim.name}`);
+					// Use the fallback animation
+					const img = fallbackFrames[0]; // Use first frame of fallback
+					if (img && img.complete && img.naturalWidth > 0) {
+						ctx.save();
+						ctx.imageSmoothingEnabled = false;
+						if (!this.facingRight) { 
+							ctx.translate(this.x + this.width, this.y); 
+							ctx.scale(-1, 1); 
+							ctx.drawImage(img, 0, 0, this.width, this.height); 
+						} else { 
+							ctx.drawImage(img, this.x, this.y, this.width, this.height); 
+						}
+						ctx.restore();
+						return;
+					}
+				}
+			}
+			
+			// If no fallback available, draw a colored rectangle based on animation
+			let color = '#ff0000'; // Default red
+			if (this.anim.name === '1-Idle') color = '#00ff00'; // Green for idle
+			else if (this.anim.name === '2-Run') color = '#0000ff'; // Blue for run
+			else if (this.anim.name === '4-Jump') color = '#ffff00'; // Yellow for jump
+			else if (this.anim.name === '5-Fall') color = '#ff00ff'; // Magenta for fall
+			else if (this.anim.name === '7-Hit') color = '#ff8800'; // Orange for hit
+			
+			ctx.fillStyle = color;
 			ctx.fillRect(this.x, this.y, this.width, this.height);
 			// Add player label
 			ctx.fillStyle = '#ffffff';
