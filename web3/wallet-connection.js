@@ -26,7 +26,28 @@ class WalletConnection {
                 name: 'Solflare',
                 icon: '<img src="Sprites/emojis/solflare.png" alt="Solflare" width="32" height="32" style="border-radius: 8px;">',
                 description: 'Professional Solana wallet',
-                check: () => window.solflare && (window.solflare.isSolflare || window.solflare.isSolflareWallet),
+                check: () => {
+                    // Enhanced Solflare detection
+                    if (!window.solflare) return false;
+                    
+                    // Check multiple possible properties
+                    const hasSolflare = window.solflare.isSolflare || 
+                                       window.solflare.isSolflareWallet || 
+                                       window.solflare.isSolflareExtension ||
+                                       (window.solflare.constructor && window.solflare.constructor.name === 'SolflareWallet') ||
+                                       (window.solflare.connect && typeof window.solflare.connect === 'function');
+                    
+                    console.log('🔍 Solflare detection check:', {
+                        isSolflare: window.solflare.isSolflare,
+                        isSolflareWallet: window.solflare.isSolflareWallet,
+                        isSolflareExtension: window.solflare.isSolflareExtension,
+                        constructorName: window.solflare.constructor?.name,
+                        hasConnectMethod: typeof window.solflare.connect === 'function',
+                        result: hasSolflare
+                    });
+                    
+                    return hasSolflare;
+                },
                 connect: () => window.solflare.connect(),
                 signMessage: (message) => window.solflare.signMessage(message, 'utf8'),
                 disconnect: () => window.solflare.disconnect(),
@@ -46,7 +67,28 @@ class WalletConnection {
                 name: 'Backpack',
                 icon: '<img src="Sprites/emojis/backpack.png" alt="Backpack" width="32" height="32" style="border-radius: 8px;">',
                 description: 'Developer-friendly wallet',
-                check: () => window.backpack && (window.backpack.isBackpack || window.backpack.isBackpackWallet),
+                check: () => {
+                    // Enhanced Backpack detection
+                    if (!window.backpack) return false;
+                    
+                    // Check multiple possible properties
+                    const hasBackpack = window.backpack.isBackpack || 
+                                       window.backpack.isBackpackWallet || 
+                                       window.backpack.isBackpackExtension ||
+                                       (window.backpack.constructor && window.backpack.constructor.name === 'BackpackWallet') ||
+                                       (window.backpack.connect && typeof window.backpack.connect === 'function');
+                    
+                    console.log('🔍 Backpack detection check:', {
+                        isBackpack: window.backpack.isBackpack,
+                        isBackpackWallet: window.backpack.isBackpackWallet,
+                        isBackpackExtension: window.backpack.isBackpackExtension,
+                        constructorName: window.backpack.constructor?.name,
+                        hasConnectMethod: typeof window.backpack.connect === 'function',
+                        result: hasBackpack
+                    });
+                    
+                    return hasBackpack;
+                },
                 connect: () => window.backpack.connect(),
                 signMessage: (message) => window.backpack.signMessage(message, 'utf8'),
                 disconnect: () => window.backpack.disconnect(),
@@ -159,15 +201,37 @@ After installing, refresh this page and try again.`;
             }
 
             // Check if wallet is available
-            if (!walletConfig.check()) {
-                throw new Error(`${walletConfig.name} wallet not found. Please install ${walletConfig.name} extension.`);
+            const walletAvailable = walletConfig.check();
+            if (!walletAvailable) {
+                console.warn(`⚠️ ${walletConfig.name} not detected by check method, but attempting connection anyway...`);
+                // Don't throw error, try to connect anyway
             }
 
             console.log(`🔗 Connecting to ${walletConfig.name} wallet...`);
             
             // Step 1: Connect to wallet (this opens wallet but doesn't authenticate)
             const response = await walletConfig.connect();
-            this.wallet = window[walletType] || window.solana; // Fallback for compatibility
+            
+            // Enhanced wallet object detection
+            let walletObject = null;
+            switch(walletType) {
+                case 'phantom':
+                    walletObject = window.solana || window.phantom;
+                    break;
+                case 'solflare':
+                    walletObject = window.solflare;
+                    break;
+                case 'backpack':
+                    walletObject = window.backpack;
+                    break;
+                case 'slope':
+                    walletObject = window.slope;
+                    break;
+                default:
+                    walletObject = window[walletType] || window.solana; // Fallback
+            }
+            
+            this.wallet = walletObject;
             
             // Check if this is a different wallet than before
             const oldWalletAddress = this.publicKey ? this.publicKey.toString() : null;
@@ -325,12 +389,29 @@ By signing this message, you agree to connect your wallet to the Kaboom game.`;
             console.log('🔍 Solflare properties:', Object.getOwnPropertyNames(window.solflare));
             console.log('🔍 Solflare.isSolflare:', window.solflare.isSolflare);
             console.log('🔍 Solflare.isSolflareWallet:', window.solflare.isSolflareWallet);
+            console.log('🔍 Solflare.isSolflareExtension:', window.solflare.isSolflareExtension);
+            console.log('🔍 Solflare.constructor.name:', window.solflare.constructor?.name);
+            console.log('🔍 Solflare.connect type:', typeof window.solflare.connect);
         }
         
         if (window.backpack) {
             console.log('🔍 Backpack properties:', Object.getOwnPropertyNames(window.backpack));
             console.log('🔍 Backpack.isBackpack:', window.backpack.isBackpack);
             console.log('🔍 Backpack.isBackpackWallet:', window.backpack.isBackpackWallet);
+            console.log('🔍 Backpack.isBackpackExtension:', window.backpack.isBackpackExtension);
+            console.log('🔍 Backpack.constructor.name:', window.backpack.constructor?.name);
+            console.log('🔍 Backpack.connect type:', typeof window.backpack.connect);
+        }
+        
+        // Test the check methods
+        console.log('🔍 Testing wallet check methods:');
+        for (const [key, wallet] of Object.entries(this.supportedWallets)) {
+            try {
+                const isAvailable = wallet.check();
+                console.log(`🔍 ${wallet.name} check result:`, isAvailable);
+            } catch (error) {
+                console.error(`🔍 ${wallet.name} check error:`, error);
+            }
         }
     }
 
@@ -1012,3 +1093,31 @@ By signing this message, you agree to connect your wallet to the Kaboom game.`;
 
 // Export for use in other modules
 window.WalletConnection = WalletConnection;
+
+// Global debug function for wallet detection
+window.debugWallets = function() {
+    console.log('🔍 === WALLET DEBUGGING ===');
+    console.log('🔍 Available wallets:', window.walletConnection?.getAvailableWallets());
+    console.log('🔍 Window objects:');
+    console.log('  - window.solana:', window.solana);
+    console.log('  - window.solflare:', window.solflare);
+    console.log('  - window.backpack:', window.backpack);
+    console.log('  - window.slope:', window.slope);
+    
+    if (window.walletConnection) {
+        window.walletConnection.debugWalletDetection();
+    }
+    
+    console.log('🔍 === END WALLET DEBUGGING ===');
+};
+
+// Global function to test wallet connection
+window.testWalletConnection = function(walletType) {
+    console.log(`🔧 Testing connection to ${walletType}...`);
+    if (window.walletConnection) {
+        return window.walletConnection.connectWallet(walletType);
+    } else {
+        console.error('❌ WalletConnection not available');
+        return false;
+    }
+};
