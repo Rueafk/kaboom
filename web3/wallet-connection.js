@@ -90,7 +90,27 @@ class WalletConnection {
                     return hasBackpack;
                 },
                 connect: () => window.backpack.connect(),
-                signMessage: (message) => window.backpack.signMessage(message, 'utf8'),
+                signMessage: async (message) => {
+                    // Backpack-specific signature handling
+                    console.log('🔍 Backpack signMessage called with:', message);
+                    try {
+                        // Try different signature formats for Backpack
+                        if (typeof message === 'string') {
+                            // If message is a string, encode it
+                            const encodedMessage = new TextEncoder().encode(message);
+                            return await window.backpack.signMessage(encodedMessage);
+                        } else if (message instanceof Uint8Array) {
+                            // If message is already encoded
+                            return await window.backpack.signMessage(message);
+                        } else {
+                            // Fallback: try to sign the message as-is
+                            return await window.backpack.signMessage(message);
+                        }
+                    } catch (error) {
+                        console.error('❌ Backpack signMessage error:', error);
+                        throw error;
+                    }
+                },
                 disconnect: () => window.backpack.disconnect(),
                 getPublicKey: () => window.backpack.publicKey
             },
@@ -270,8 +290,32 @@ After installing, refresh this page and try again.`;
             const message = this.createSignInMessage();
             const encodedMessage = new TextEncoder().encode(message);
             
-            // Request signature from user
-            const signature = await walletConfig.signMessage(encodedMessage);
+            console.log('🔍 Message to sign:', message);
+            console.log('🔍 Encoded message:', encodedMessage);
+            
+            // Request signature from user with enhanced error handling
+            let signature;
+            try {
+                signature = await walletConfig.signMessage(encodedMessage);
+                console.log('🔍 Raw signature response:', signature);
+            } catch (signError) {
+                console.error(`❌ Signature failed for ${walletType}:`, signError);
+                
+                // Try alternative signature methods for specific wallets
+                if (walletType === 'backpack') {
+                    console.log('🔄 Trying alternative Backpack signature method...');
+                    try {
+                        // Try signing with string message instead of encoded
+                        signature = await walletConfig.signMessage(message);
+                        console.log('🔍 Alternative signature response:', signature);
+                    } catch (altError) {
+                        console.error('❌ Alternative signature also failed:', altError);
+                        throw new Error(`Backpack signature failed: ${altError.message}`);
+                    }
+                } else {
+                    throw signError;
+                }
+            }
             
             // Step 3: Verify the signature
             const isValid = await this.verifySignature(message, signature.signature, this.publicKey);
