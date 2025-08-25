@@ -3676,6 +3676,13 @@ class Player {
 			this.velX = 0;
 			this.velY = -8; // Small death jump
 			if (game.soundManager) game.soundManager.play('gameOver');
+			
+			// Show game over screen
+			if (window.game && window.game.showGameOver) {
+				window.game.showGameOver();
+			} else {
+				console.error('Game over function not found!');
+			}
 		} else {
 			// Respawn immediately with remaining lives
 			console.log(`=== RESPAWNING - ${this.lives} LIVES LEFT ===`);

@@ -503,6 +503,15 @@
         .recharge-btn:hover {
             background: #e04a5f;
         }
+
+        .restart-btn {
+            background: #32CD32;
+            color: white;
+        }
+
+        .restart-btn:hover {
+            background: #228B22;
+        }
         
         .hint-text {
             color: #87CEEB;
@@ -1758,8 +1767,9 @@
             
             <!-- Game Over Action Buttons -->
             <div class="game-over-buttons">
-                <button class="game-over-btn profile-btn" id="profileBtn">Profile</button>
-                <button class="game-over-btn recharge-btn" id="rechargeBtn">Recharge</button>
+                <button class="game-over-btn restart-btn" id="restartBtn">🔄 Restart</button>
+                <button class="game-over-btn profile-btn" id="profileBtn">👤 Profile</button>
+                <button class="game-over-btn recharge-btn" id="rechargeBtn">⚡ Recharge</button>
             </div>
         </div>
         
@@ -2388,8 +2398,34 @@
         
         // Game Over Button Handlers
         function initializeGameOverButtons() {
+            const restartBtn = document.getElementById('restartBtn');
             const profileBtn = document.getElementById('profileBtn');
             const rechargeBtn = document.getElementById('rechargeBtn');
+            
+            // Restart Button Handler - Restart the game
+            if (restartBtn) {
+                restartBtn.onclick = () => {
+                    console.log('🔄 Restart button clicked');
+                    
+                    // Hide game over screen
+                    const gameOverScreen = document.getElementById('gameOver');
+                    if (gameOverScreen) {
+                        gameOverScreen.style.display = 'none';
+                    }
+                    
+                    // Reset game to level 1
+                    if (window.game && window.game.resetToLevelOne) {
+                        window.game.resetToLevelOne();
+                    }
+                    
+                    // Reset player lives if available
+                    if (window.rechargeManager) {
+                        window.rechargeManager.resetLives();
+                    }
+                    
+                    console.log('🔄 Game restarted successfully');
+                };
+            }
             
             // Profile Button Handler - Navigate to Recharged page
             if (profileBtn) {

@@ -482,6 +482,30 @@ class RechargeManager {
         
         console.log('🔋 RechargeManager status cleared');
     }
+
+    // Reset lives for game restart
+    async resetLives() {
+        try {
+            console.log('🔄 Resetting lives for game restart...');
+            
+            if (this.currentWallet) {
+                // Reset lives to 3 in the database
+                await this.updateLivesRemaining(3);
+                
+                // Clear any active recharge
+                await this.completeRecharge();
+                
+                // Update UI
+                this.updateUI();
+                
+                console.log('🔄 Lives reset successfully');
+            } else {
+                console.warn('⚠️ No wallet connected, cannot reset lives');
+            }
+        } catch (error) {
+            console.error('❌ Error resetting lives:', error);
+        }
+    }
 }
 
 // Export for use in other modules
