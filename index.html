@@ -2333,7 +2333,8 @@
             
             try {
                 const response = await fetch('/api/players');
-                const players = await response.json();
+                const data = await response.json();
+                const players = data.players || []; // Extract players array from response
                 
                 if (players.length === 0) {
                     leaderboardList.innerHTML = '<div class="no-leaderboard">No players found</div>';

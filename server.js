@@ -620,6 +620,26 @@ function awardAchievement(wallet_address, achievementId) {
     });
 }
 
+// Get individual player profile
+app.get('/api/players/:walletAddress', (req, res) => {
+    const walletAddress = req.params.walletAddress;
+    
+    const query = 'SELECT * FROM players WHERE wallet_address = ?';
+    
+    db.get(query, [walletAddress], (err, row) => {
+        if (err) {
+            res.status(500).json({ error: err.message });
+            return;
+        }
+        
+        if (row) {
+            res.json(row);
+        } else {
+            res.status(404).json({ error: 'Player not found' });
+        }
+    });
+});
+
 // Get player achievements
 app.get('/api/players/:walletAddress/achievements', (req, res) => {
     const walletAddress = req.params.walletAddress;
