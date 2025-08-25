@@ -210,7 +210,9 @@ After installing, refresh this page and try again.`;
             console.log(`🔗 Connecting to ${walletConfig.name} wallet...`);
             
             // Step 1: Connect to wallet (this opens wallet but doesn't authenticate)
+            console.log(`🔗 Attempting to connect to ${walletType}...`);
             const response = await walletConfig.connect();
+            console.log(`🔗 ${walletType} connect response:`, response);
             
             // Enhanced wallet object detection
             let walletObject = null;
@@ -233,11 +235,27 @@ After installing, refresh this page and try again.`;
             
             this.wallet = walletObject;
             
+            // Validate response and extract public key
+            let publicKey = null;
+            if (response && response.publicKey) {
+                publicKey = response.publicKey;
+            } else if (response && response.publicKeyBase58) {
+                // Some wallets return publicKeyBase58
+                publicKey = response.publicKeyBase58;
+            } else if (walletObject && walletObject.publicKey) {
+                // Fallback to wallet object's public key
+                publicKey = walletObject.publicKey;
+            } else {
+                throw new Error(`Invalid response from ${walletType} wallet. Expected publicKey but got: ${JSON.stringify(response)}`);
+            }
+            
+            console.log(`🔗 Extracted public key from ${walletType}:`, publicKey);
+            
             // Check if this is a different wallet than before
             const oldWalletAddress = this.publicKey ? this.publicKey.toString() : null;
-            const newWalletAddress = response.publicKey.toString();
+            const newWalletAddress = publicKey.toString();
             
-            this.publicKey = response.publicKey;
+            this.publicKey = publicKey;
             this.selectedWallet = walletType;
             
             // If this is a different wallet, handle the change
