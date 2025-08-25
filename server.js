@@ -11,7 +11,7 @@ const NODE_ENV = process.env.NODE_ENV || 'development';
 
 // Enhanced middleware with security
 const allowedOrigins = NODE_ENV === 'production' 
-    ? ['https://your-app-name.onrender.com', 'https://kaboom-game.onrender.com']
+    ? ['https://kaboom-game.vercel.app', 'https://kaboom-game.netlify.app', 'https://kaboom-game.onrender.com']
     : ['http://localhost:3000', 'http://127.0.0.1:3000'];
 
 app.use(cors({
