@@ -76,6 +76,27 @@ npm run dev
 open http://localhost:3000
 ```
 
+## 🚀 Deployment
+
+### Deploy to Koyeb
+
+1. **Push to GitHub**
+   ```bash
+   git add .
+   git commit -m "Ready for deployment"
+   git push origin main
+   ```
+
+2. **Deploy to Koyeb**
+   - Go to [koyeb.com](https://koyeb.com)
+   - Connect your GitHub repository
+   - Deploy automatically
+
+3. **Get Your URL**
+   - Your game will be live at: `https://kaboom-game-rueafk.koyeb.app`
+
+**For detailed instructions, see [KOYEB_DEPLOYMENT.md](KOYEB_DEPLOYMENT.md)**
+
 ## 🔧 Configuration
 
 ### Environment Variables
