@@ -2262,6 +2262,13 @@ class PirateBombGame {
 	}
 	
 	showGameOver() {
+		console.log('🎮 showGameOver() called!');
+		console.log('🎮 Player lives:', this.player ? this.player.lives : 'No player');
+		console.log('🎮 Game state gameOver:', this.gameState.gameOver);
+		
+		// Set game over state
+		this.gameState.gameOver = true;
+		
 		// Safety check: Don't show game over if player has lives
 		if (this.player && this.player.lives > 0) {
 			console.log('SAFETY CHECK: Attempting to show game over but player has lives! Cancelling...');
@@ -2271,9 +2278,18 @@ class PirateBombGame {
 		
 		const gameOverScreen = document.getElementById('gameOver');
 		const finalScore = document.getElementById('finalScore');
+		
+		console.log('🎮 Game over screen element:', gameOverScreen);
+		console.log('🎮 Final score element:', finalScore);
+		
 		if (gameOverScreen && finalScore) {
 			finalScore.textContent = `Final Score: ${this.gameState.currentScore} | Total Score: ${this.gameState.totalScore}`;
 			gameOverScreen.style.display = 'block';
+			console.log('✅ Game over screen displayed successfully!');
+		} else {
+			console.error('❌ Game over screen elements not found!');
+			console.error('❌ gameOverScreen:', gameOverScreen);
+			console.error('❌ finalScore:', finalScore);
 		}
 		
 					// Save final player profile when game over
@@ -6033,6 +6049,28 @@ window.startGame = async function() {
 
 	
 	console.log('✅ Game started successfully!');
+	
+	// Debug function to test game over screen
+	window.testGameOver = function() {
+		console.log('🧪 Testing game over screen...');
+		if (window.game && window.game.showGameOver) {
+			window.game.showGameOver();
+		} else {
+			console.error('❌ Game or showGameOver function not available');
+		}
+	};
+	
+	// Debug function to force player death for testing
+	window.testPlayerDeath = function() {
+		console.log('🧪 Forcing player death for testing...');
+		if (window.game && window.game.player) {
+			window.game.player.lives = 0;
+			window.game.player.health = 0;
+			window.game.player.die();
+		} else {
+			console.error('❌ Game or player not available');
+		}
+	};
 	
 	} catch (error) {
 		console.error('❌ Game initialization failed:', error);
