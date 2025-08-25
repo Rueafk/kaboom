@@ -1073,6 +1073,78 @@
             border: 2px solid #FF0000;
         }
 
+        /* Wallet Selector Styles */
+        .wallet-install-section {
+            margin-top: 20px;
+            padding: 15px;
+            background: rgba(135, 206, 235, 0.1);
+            border-radius: 10px;
+            border: 1px solid rgba(70, 130, 180, 0.3);
+        }
+
+        .wallet-install-section h4 {
+            color: #4682B4;
+            margin-bottom: 10px;
+        }
+
+        .wallet-install-links {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .wallet-install-link {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 8px;
+            color: #4682B4;
+            text-decoration: none;
+            transition: all 0.3s ease;
+        }
+
+        .wallet-install-link:hover {
+            background: rgba(70, 130, 180, 0.2);
+            transform: translateY(-2px);
+        }
+
+        .wallet-manual-section {
+            margin-top: 20px;
+            padding: 15px;
+            background: rgba(255, 215, 0, 0.1);
+            border-radius: 10px;
+            border: 1px solid rgba(255, 215, 0, 0.3);
+        }
+
+        .wallet-manual-section h4 {
+            color: #FFD700;
+            margin-bottom: 10px;
+        }
+
+        .wallet-manual-buttons {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .wallet-manual-btn {
+            padding: 8px 16px;
+            background: linear-gradient(145deg, #FFD700, #FFA500);
+            border: none;
+            border-radius: 20px;
+            color: white;
+            cursor: pointer;
+            font-weight: bold;
+            transition: all 0.3s ease;
+        }
+
+        .wallet-manual-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(255, 215, 0, 0.3);
+        }
+
         @keyframes slideDown {
             from {
                 transform: translateX(-50%) translateY(-100%);

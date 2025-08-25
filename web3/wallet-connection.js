@@ -26,7 +26,7 @@ class WalletConnection {
                 name: 'Solflare',
                 icon: '<img src="Sprites/emojis/solflare.png" alt="Solflare" width="32" height="32" style="border-radius: 8px;">',
                 description: 'Professional Solana wallet',
-                check: () => window.solflare && window.solflare.isSolflare,
+                check: () => window.solflare && (window.solflare.isSolflare || window.solflare.isSolflareWallet),
                 connect: () => window.solflare.connect(),
                 signMessage: (message) => window.solflare.signMessage(message, 'utf8'),
                 disconnect: () => window.solflare.disconnect(),
@@ -46,7 +46,7 @@ class WalletConnection {
                 name: 'Backpack',
                 icon: '<img src="Sprites/emojis/backpack.png" alt="Backpack" width="32" height="32" style="border-radius: 8px;">',
                 description: 'Developer-friendly wallet',
-                check: () => window.backpack && window.backpack.isBackpack,
+                check: () => window.backpack && (window.backpack.isBackpack || window.backpack.isBackpackWallet),
                 connect: () => window.backpack.connect(),
                 signMessage: (message) => window.backpack.signMessage(message, 'utf8'),
                 disconnect: () => window.backpack.disconnect(),
@@ -127,7 +127,16 @@ class WalletConnection {
             if (!walletType) {
                 const availableWallets = this.getAvailableWallets();
                 if (availableWallets.length === 0) {
-                    throw new Error('No Solana wallets found. Please install a supported wallet extension.');
+                    // Provide more detailed error message with installation links
+                    const errorMessage = `No Solana wallets found. Please install one of these wallet extensions:
+                    
+• Phantom: https://phantom.app/
+• Solflare: https://solflare.com/
+• Backpack: https://backpack.app/
+• Slope: https://slope.finance/
+
+After installing, refresh this page and try again.`;
+                    throw new Error(errorMessage);
                 } else if (availableWallets.length === 1) {
                     walletType = availableWallets[0].key;
                 } else {
@@ -280,22 +289,57 @@ By signing this message, you agree to connect your wallet to the Kaboom game.`;
     // Get list of available wallets
     getAvailableWallets() {
         const available = [];
+        console.log('🔍 Checking for available wallets...');
+        
         for (const [key, wallet] of Object.entries(this.supportedWallets)) {
-            if (wallet.check()) {
-                available.push({
-                    key: key,
-                    name: wallet.name,
-                    icon: wallet.icon,
-                    description: wallet.description
-                });
+            try {
+                const isAvailable = wallet.check();
+                console.log(`🔍 ${wallet.name}: ${isAvailable ? '✅ Available' : '❌ Not available'}`);
+                
+                if (isAvailable) {
+                    available.push({
+                        key: key,
+                        name: wallet.name,
+                        icon: wallet.icon,
+                        description: wallet.description
+                    });
+                }
+            } catch (error) {
+                console.warn(`🔍 Error checking ${wallet.name}:`, error);
             }
         }
+        
+        console.log(`🔍 Found ${available.length} available wallets:`, available.map(w => w.name));
         return available;
+    }
+
+    // Debug wallet detection
+    debugWalletDetection() {
+        console.log('🔍 Debugging wallet detection...');
+        console.log('🔍 window.solana:', window.solana);
+        console.log('🔍 window.solflare:', window.solflare);
+        console.log('🔍 window.backpack:', window.backpack);
+        console.log('🔍 window.slope:', window.slope);
+        
+        if (window.solflare) {
+            console.log('🔍 Solflare properties:', Object.getOwnPropertyNames(window.solflare));
+            console.log('🔍 Solflare.isSolflare:', window.solflare.isSolflare);
+            console.log('🔍 Solflare.isSolflareWallet:', window.solflare.isSolflareWallet);
+        }
+        
+        if (window.backpack) {
+            console.log('🔍 Backpack properties:', Object.getOwnPropertyNames(window.backpack));
+            console.log('🔍 Backpack.isBackpack:', window.backpack.isBackpack);
+            console.log('🔍 Backpack.isBackpackWallet:', window.backpack.isBackpackWallet);
+        }
     }
 
     // Show wallet selector modal
     showWalletSelector() {
         const availableWallets = this.getAvailableWallets();
+        
+        // Also check for wallets that might be installed but not detected
+        this.debugWalletDetection();
         
         // Create modal HTML
         const modalHTML = `
@@ -318,6 +362,36 @@ By signing this message, you agree to connect your wallet to the Kaboom game.`;
                                     <div class="wallet-arrow">→</div>
                                 </div>
                             `).join('')}
+                        </div>
+                        
+                        ${availableWallets.length === 0 ? `
+                            <div class="wallet-install-section">
+                                <h4>No wallets detected. Install a wallet extension:</h4>
+                                <div class="wallet-install-links">
+                                    <a href="https://phantom.app/" target="_blank" class="wallet-install-link">
+                                        <img src="Sprites/emojis/phantom.png" alt="Phantom" width="24" height="24">
+                                        Install Phantom
+                                    </a>
+                                    <a href="https://solflare.com/" target="_blank" class="wallet-install-link">
+                                        <img src="Sprites/emojis/solflare.png" alt="Solflare" width="24" height="24">
+                                        Install Solflare
+                                    </a>
+                                    <a href="https://backpack.app/" target="_blank" class="wallet-install-link">
+                                        <img src="Sprites/emojis/backpack.png" alt="Backpack" width="24" height="24">
+                                        Install Backpack
+                                    </a>
+                                </div>
+                            </div>
+                        ` : ''}
+                        
+                        <div class="wallet-manual-section">
+                            <h4>Manual Connection</h4>
+                            <p>If your wallet is installed but not detected, try manual connection:</p>
+                            <div class="wallet-manual-buttons">
+                                <button onclick="window.walletConnection.manualConnect('phantom')" class="wallet-manual-btn">Try Phantom</button>
+                                <button onclick="window.walletConnection.manualConnect('solflare')" class="wallet-manual-btn">Try Solflare</button>
+                                <button onclick="window.walletConnection.manualConnect('backpack')" class="wallet-manual-btn">Try Backpack</button>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -867,6 +941,71 @@ By signing this message, you agree to connect your wallet to the Kaboom game.`;
                 playerTokenBalance.textContent = currentTokens;
                 console.log(`💰 Wallet update - Token display: ${currentTokens} (from score: ${window.game.gameState.totalScore})`);
             }
+        }
+    }
+
+    // Manual connection method for wallets that might not be auto-detected
+    async manualConnect(walletType) {
+        try {
+            console.log(`🔧 Attempting manual connection to ${walletType}...`);
+            
+            // Force check for wallet in different ways
+            let wallet = null;
+            
+            switch(walletType) {
+                case 'phantom':
+                    wallet = window.solana || window.phantom;
+                    break;
+                case 'solflare':
+                    wallet = window.solflare;
+                    break;
+                case 'backpack':
+                    wallet = window.backpack;
+                    break;
+                default:
+                    throw new Error(`Unknown wallet type: ${walletType}`);
+            }
+            
+            if (!wallet) {
+                throw new Error(`${walletType} wallet not found. Please make sure the extension is installed and enabled.`);
+            }
+            
+            console.log(`🔧 Found ${walletType} wallet:`, wallet);
+            
+            // Try to connect
+            const response = await wallet.connect();
+            console.log(`🔧 ${walletType} connection response:`, response);
+            
+            // Set up the wallet connection
+            this.wallet = wallet;
+            this.publicKey = response.publicKey;
+            this.selectedWallet = walletType;
+            this.isConnected = true;
+            
+            // Update UI
+            this.updateConnectionUI();
+            
+            // Load player data
+            await this.loadPlayerData();
+            
+            // Update player info
+            this.updatePlayerInfo();
+            
+            // Close modal
+            const modal = document.getElementById('walletSelectorModal');
+            if (modal) {
+                modal.remove();
+            }
+            
+            // Show success message
+            this.showSuccess(`${walletType} wallet connected successfully!`);
+            
+            return true;
+            
+        } catch (error) {
+            console.error(`❌ Manual connection to ${walletType} failed:`, error);
+            this.showError(`Failed to connect to ${walletType}: ${error.message}`);
+            return false;
         }
     }
 }
