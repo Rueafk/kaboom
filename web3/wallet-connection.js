@@ -1063,11 +1063,38 @@ By signing this message, you agree to connect your wallet to the Kaboom game.`;
 
 
 
-    updatePlayerInfo() {
+    async updatePlayerInfo() {
         const playerLevel = document.getElementById('playerLevel');
         const playerScore = document.getElementById('playerScore');
         const playerTokenBalance = document.getElementById('playerTokenBalance');
         
+        // First try to load latest data from database
+        if (this.publicKey && window.playerDataManager) {
+            try {
+                const walletAddress = this.publicKey.toString();
+                const playerProfile = await window.playerDataManager.loadPlayerProfile(walletAddress);
+                
+                if (playerProfile) {
+                    console.log('📊 Updating player info from database:', playerProfile);
+                    
+                    if (playerLevel) {
+                        playerLevel.textContent = playerProfile.level || 1;
+                    }
+                    if (playerScore) {
+                        playerScore.textContent = playerProfile.totalScore || 0;
+                    }
+                    if (playerTokenBalance) {
+                        playerTokenBalance.textContent = playerProfile.boomTokens || 0;
+                        console.log(`💰 Database update - Token display: ${playerProfile.boomTokens} (from database)`);
+                    }
+                    return; // Use database data if available
+                }
+            } catch (error) {
+                console.warn('⚠️ Failed to load player data from database, using game state:', error);
+            }
+        }
+        
+        // Fallback to game state if database data not available
         if (window.game && window.game.gameState) {
             if (playerLevel) {
                 playerLevel.textContent = window.game.gameState.level || 1;
@@ -1082,7 +1109,7 @@ By signing this message, you agree to connect your wallet to the Kaboom game.`;
             if (playerTokenBalance) {
                 const currentTokens = Math.floor(window.game.gameState.totalScore * 0.10);
                 playerTokenBalance.textContent = currentTokens;
-                console.log(`💰 Wallet update - Token display: ${currentTokens} (from score: ${window.game.gameState.totalScore})`);
+                console.log(`💰 Game state update - Token display: ${currentTokens} (from score: ${window.game.gameState.totalScore})`);
             }
         }
     }
@@ -1132,7 +1159,7 @@ By signing this message, you agree to connect your wallet to the Kaboom game.`;
             await this.loadPlayerData();
             
             // Update player info
-            this.updatePlayerInfo();
+            await this.updatePlayerInfo();
             
             // Close modal
             const modal = document.getElementById('walletSelectorModal');

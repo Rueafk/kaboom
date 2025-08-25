@@ -2237,7 +2237,9 @@ class PirateBombGame {
 				
 				// Update Web3 player info if wallet is connected
 				if (window.walletConnection) {
-					window.walletConnection.updatePlayerInfo();
+					window.walletConnection.updatePlayerInfo().catch(error => {
+						console.warn('Failed to update player info:', error);
+					});
 				}
 				
 				// Direct token display update
@@ -2518,7 +2520,9 @@ class PirateBombGame {
 					
 					// Update UI to reflect new values
 					if (window.walletConnection && window.walletConnection.updatePlayerInfo) {
-						window.walletConnection.updatePlayerInfo();
+						window.walletConnection.updatePlayerInfo().catch(error => {
+							console.warn('Failed to update player info:', error);
+						});
 					}
 					this.updateUI();
 					
@@ -2550,7 +2554,9 @@ class PirateBombGame {
 					console.log(`💰 Profile saved successfully! Updated tokens: ${newTokens} (10% of ${this.gameState.totalScore})`);
 					// Update UI to reflect new values
 					if (window.walletConnection && window.walletConnection.updatePlayerInfo) {
-						window.walletConnection.updatePlayerInfo();
+						window.walletConnection.updatePlayerInfo().catch(error => {
+							console.warn('Failed to update player info:', error);
+						});
 					}
 					this.updateUI();
 					
@@ -4771,7 +4777,9 @@ class Enemy {
 							console.log(`💰 Profile saved successfully! Updated tokens: ${newTokens} (10% of ${game.gameState.totalScore})`);
 							// Update UI to reflect new values
 							if (window.walletConnection && window.walletConnection.updatePlayerInfo) {
-								window.walletConnection.updatePlayerInfo();
+								window.walletConnection.updatePlayerInfo().catch(error => {
+									console.warn('Failed to update player info:', error);
+								});
 							}
 							if (game && game.updateUI) {
 								game.updateUI();
@@ -6004,7 +6012,9 @@ window.startGame = async function() {
 						
 						// Update UI to reflect loaded data
 						if (window.walletConnection && window.walletConnection.updatePlayerInfo) {
-							window.walletConnection.updatePlayerInfo();
+							window.walletConnection.updatePlayerInfo().catch(error => {
+								console.warn('Failed to update player info:', error);
+							});
 						}
 						if (game.updateUI) {
 							game.updateUI();

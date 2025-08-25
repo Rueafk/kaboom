@@ -2166,9 +2166,9 @@
             
             // Settings button click handler
             if (settingsBtn) {
-                settingsBtn.addEventListener('click', () => {
+                settingsBtn.addEventListener('click', async () => {
                     settingsPanel.classList.add('show');
-                    updateSettingsData();
+                    await updateSettingsData();
                 });
             }
             
@@ -2257,12 +2257,27 @@
         }
         
         // Update settings data
-        function updateSettingsData() {
+        async function updateSettingsData() {
             // Update profile data
             if (window.walletConnection && window.walletConnection.publicKey) {
                 const walletAddress = window.walletConnection.publicKey.toString();
                 document.getElementById('profileWallet').textContent = 
                     walletAddress.substring(0, 8) + '...' + walletAddress.substring(walletAddress.length - 8);
+            }
+            
+            // First try to refresh player data from database
+            if (window.walletConnection && window.walletConnection.publicKey && window.playerDataManager) {
+                try {
+                    const walletAddress = window.walletConnection.publicKey.toString();
+                    const freshProfile = await window.playerDataManager.loadPlayerProfile(walletAddress);
+                    
+                    if (freshProfile) {
+                        console.log('📊 Refreshed player profile from database:', freshProfile);
+                        window.playerProfile = freshProfile;
+                    }
+                } catch (error) {
+                    console.warn('⚠️ Failed to refresh player profile from database:', error);
+                }
             }
             
             if (window.playerProfile) {
