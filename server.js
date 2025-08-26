@@ -30,6 +30,11 @@ app.use(cors({
 app.use(bodyParser.json({ limit: '10mb' }));
 app.use(express.static('.'));
 
+// Admin dashboard route
+app.get('/admin', (req, res) => {
+    res.sendFile(path.join(__dirname, 'admin-dashboard.html'));
+});
+
 // Database setup with enhanced error handling
 const db = new sqlite3.Database('./player_data.db', (err) => {
     if (err) {
