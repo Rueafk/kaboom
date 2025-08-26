@@ -370,6 +370,19 @@
                 
                 const players = data.players || [];
                 
+                // Check if we're in demo mode
+                if (data.message && data.message.includes('Demo mode')) {
+                    console.log('🎮 Running in demo mode - showing test data');
+                    // Update stats normally with test data
+                    updateStats(players);
+                    updatePlayersTable(players);
+                    
+                    // Add demo indicator
+                    document.querySelector('.header p').textContent = 
+                        `Worldwide Real-time Game Monitoring - DEMO MODE - Last updated: ${new Date().toLocaleTimeString()}`;
+                    return;
+                }
+                
                 // Check if we're in fallback mode
                 if (data.message && data.message.includes('fallback mode')) {
                     console.log('⚠️ Running in fallback mode - no database available');
