@@ -1827,7 +1827,8 @@
     <script src="web3/player-registry-client.js"></script>
     	<script src="web3/player-data-manager.js"></script>
 	<script src="web3/recharge-manager.js"></script>
-	<script src="web3/game-session-manager.js"></script>
+	    <script src="web3/game-session-manager.js"></script>
+    <script src="test-data-flow.js"></script>
     
     <script>
         // Immediate debugging
@@ -2191,11 +2192,8 @@
             }
             
             // Also update settings data when wallet connects
-            if (window.walletConnection) {
-                window.walletConnection.addEventListener('connected', async () => {
-                    await updateSettingsData();
-                });
-            }
+            // Note: walletConnection doesn't have addEventListener, so we'll handle this differently
+            // The updateSettingsData will be called from wallet-connection.js when connection is established
             
             // Close button click handler
             if (closeSettingsBtn) {

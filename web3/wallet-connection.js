@@ -1093,7 +1093,7 @@ By signing this message, you agree to connect your wallet to the Kaboom game.`;
                     
                     // Update settings panel if it's open
                     if (typeof updateSettingsData === 'function') {
-                        updateSettingsData();
+                        setTimeout(() => updateSettingsData(), 100); // Small delay to ensure everything is loaded
                     }
                     
                     return; // Use database data if available
@@ -1169,6 +1169,11 @@ By signing this message, you agree to connect your wallet to the Kaboom game.`;
             
             // Update player info
             await this.updatePlayerInfo();
+            
+            // Update settings data if function exists
+            if (typeof updateSettingsData === 'function') {
+                setTimeout(() => updateSettingsData(), 100);
+            }
             
             // Close modal
             const modal = document.getElementById('walletSelectorModal');

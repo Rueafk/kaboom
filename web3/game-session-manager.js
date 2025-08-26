@@ -265,6 +265,9 @@ class GameSessionManager {
     
     // Update session statistics
     updateSessionStats(type, value = 1) {
+        console.log(`🔄 GameSessionManager: Updating ${type} with value ${value}`);
+        console.log(`📊 Before update - Session data:`, { ...this.sessionData });
+        
         switch (type) {
             case 'score':
                 this.sessionData.score_earned += value;
@@ -286,7 +289,19 @@ class GameSessionManager {
                 break;
         }
         
-        console.log(`📊 GameSessionManager: Updated ${type} = ${value}, Session data:`, this.sessionData);
+        console.log(`📊 After update - Session data:`, this.sessionData);
+        
+        // Auto-save if session is active
+        if (this.isSessionActive()) {
+            console.log('💾 Auto-saving session data...');
+            this.savePlayerProfile().then(result => {
+                if (result.success) {
+                    console.log('✅ Auto-save successful');
+                } else {
+                    console.warn('⚠️ Auto-save failed:', result.error);
+                }
+            });
+        }
     }
     
     // Get current session data
