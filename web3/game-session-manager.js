@@ -81,6 +81,16 @@ class GameSessionManager {
             // Calculate final session data
             this.updateSessionData();
             
+            console.log('🏁 GameSessionManager: Ending session with data:', this.sessionData);
+            
+            // First, save the player profile with session data
+            console.log('💾 GameSessionManager: Saving final player profile...');
+            const saveResult = await this.savePlayerProfile();
+            if (!saveResult.success) {
+                console.warn('⚠️ GameSessionManager: Failed to save player profile:', saveResult.error);
+            }
+            
+            // Then end the session
             const response = await fetch(`${this.apiBase}/sessions/end`, {
                 method: 'POST',
                 headers: {
@@ -95,7 +105,7 @@ class GameSessionManager {
             
             if (response.ok) {
                 const result = await response.json();
-                console.log('🏁 GameSessionManager: Session ended:', result);
+                console.log('🏁 GameSessionManager: Session ended successfully:', result);
                 
                 // Stop real-time updates
                 this.stopRealTimeUpdates();
@@ -108,7 +118,8 @@ class GameSessionManager {
                 
                 return { success: true, data: result };
             } else {
-                throw new Error(`Server error: ${response.status}`);
+                const errorData = await response.json();
+                throw new Error(`Server error: ${response.status} - ${JSON.stringify(errorData)}`);
             }
         } catch (error) {
             console.error('❌ GameSessionManager: Error ending session:', error);
@@ -176,6 +187,30 @@ class GameSessionManager {
             return { success: false, error: 'Save too frequent' };
         }
         
+        // Get current player profile data
+        const currentProfile = window.playerProfile || {};
+        
+        // Calculate new totals by adding session data to existing profile data
+        const newTotalScore = (currentProfile.totalScore || 0) + this.sessionData.score_earned;
+        const newTotalTokens = (currentProfile.boomTokens || 0) + this.sessionData.tokens_earned;
+        const newGamesPlayed = (currentProfile.gamesPlayed || 0) + (this.sessionData.score_earned > 0 ? 1 : 0);
+        const newTotalEnemiesKilled = (currentProfile.totalEnemiesKilled || 0) + this.sessionData.enemies_killed;
+        const newTotalBombsUsed = (currentProfile.totalBombsUsed || 0) + this.sessionData.bombs_used;
+        
+        console.log('💾 GameSessionManager: Saving profile with session data:', {
+            currentProfile: {
+                totalScore: currentProfile.totalScore || 0,
+                boomTokens: currentProfile.boomTokens || 0,
+                gamesPlayed: currentProfile.gamesPlayed || 0
+            },
+            sessionData: this.sessionData,
+            newTotals: {
+                totalScore: newTotalScore,
+                boomTokens: newTotalTokens,
+                gamesPlayed: newGamesPlayed
+            }
+        });
+        
         try {
             const response = await fetch(`${this.apiBase}/players`, {
                 method: 'POST',
@@ -184,26 +219,38 @@ class GameSessionManager {
                 },
                 body: JSON.stringify({
                     wallet_address: this.currentWallet,
-                    username: window.playerProfile?.username || 'Player',
-                    level: window.playerProfile?.level || 1,
-                    total_score: window.playerProfile?.totalScore || 0,
-                    boom_tokens: window.playerProfile?.boomTokens || 0,
-                    lives: window.playerProfile?.lives || 3,
-                    current_score: window.playerProfile?.currentScore || 0,
-                    experience_points: window.playerProfile?.experiencePoints || 0,
-                    games_played: window.playerProfile?.gamesPlayed || 0,
-                    games_won: window.playerProfile?.gamesWon || 0,
-                    total_enemies_killed: window.playerProfile?.totalEnemiesKilled || 0,
-                    total_bombs_used: window.playerProfile?.totalBombsUsed || 0
+                    username: currentProfile.username || 'Player',
+                    level: currentProfile.level || 1,
+                    total_score: newTotalScore,
+                    boom_tokens: newTotalTokens,
+                    lives: currentProfile.lives || 3,
+                    current_score: this.sessionData.score_earned, // Current session score
+                    experience_points: currentProfile.experiencePoints || 0,
+                    games_played: newGamesPlayed,
+                    games_won: currentProfile.gamesWon || 0,
+                    total_enemies_killed: newTotalEnemiesKilled,
+                    total_bombs_used: newTotalBombsUsed
                 })
             });
             
             if (response.ok) {
                 this.lastSaveTime = now;
-                console.log('💾 GameSessionManager: Player profile saved');
+                console.log('✅ GameSessionManager: Player profile saved with updated totals');
+                
+                // Update the local player profile with new totals
+                if (window.playerProfile) {
+                    window.playerProfile.totalScore = newTotalScore;
+                    window.playerProfile.boomTokens = newTotalTokens;
+                    window.playerProfile.gamesPlayed = newGamesPlayed;
+                    window.playerProfile.totalEnemiesKilled = newTotalEnemiesKilled;
+                    window.playerProfile.totalBombsUsed = newTotalBombsUsed;
+                    console.log('🔄 Updated local player profile:', window.playerProfile);
+                }
+                
                 return { success: true };
             } else {
-                throw new Error(`Server error: ${response.status}`);
+                const errorData = await response.json();
+                throw new Error(`Server error: ${response.status} - ${JSON.stringify(errorData)}`);
             }
         } catch (error) {
             console.error('❌ GameSessionManager: Error saving profile:', error);
