@@ -282,6 +282,162 @@ app.get('/api/players/:walletAddress/sessions', async (req, res) => {
     }
 });
 
+// Recharge system endpoints
+app.get('/api/recharge/:walletAddress', async (req, res) => {
+    if (!dbInitialized) {
+        return res.json({
+            wallet_address: req.params.walletAddress,
+            lives_remaining: 3,
+            is_recharging: false,
+            time_remaining_ms: 0,
+            time_remaining_minutes: 0,
+            can_play: true,
+            total_recharges: 0,
+            last_recharge_time: null,
+            recharge_cooldown_end: null
+        });
+    }
+    
+    try {
+        const walletAddress = req.params.walletAddress;
+        const query = `SELECT * FROM recharge_tracking WHERE wallet_address = $1`;
+        
+        const client = await database.pgPool.connect();
+        const result = await client.query(query, [walletAddress]);
+        client.release();
+        
+        if (result.rows.length > 0) {
+            const row = result.rows[0];
+            const now = new Date();
+            const cooldownEnd = row.recharge_cooldown_end ? new Date(row.recharge_cooldown_end) : null;
+            const isRecharging = cooldownEnd && now < cooldownEnd;
+            const timeRemaining = isRecharging ? Math.max(0, cooldownEnd - now) : 0;
+            
+            res.json({
+                wallet_address: row.wallet_address,
+                lives_remaining: row.lives_remaining,
+                is_recharging: isRecharging,
+                time_remaining_ms: timeRemaining,
+                time_remaining_minutes: Math.ceil(timeRemaining / (1000 * 60)),
+                can_play: !isRecharging && row.lives_remaining > 0,
+                total_recharges: row.total_recharges,
+                last_recharge_time: row.last_recharge_time,
+                recharge_cooldown_end: row.recharge_cooldown_end
+            });
+        } else {
+            res.json({
+                wallet_address: walletAddress,
+                lives_remaining: 3,
+                is_recharging: false,
+                time_remaining_ms: 0,
+                time_remaining_minutes: 0,
+                can_play: true,
+                total_recharges: 0,
+                last_recharge_time: null,
+                recharge_cooldown_end: null
+            });
+        }
+    } catch (error) {
+        console.error('❌ Error fetching recharge status:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+app.post('/api/recharge/start/:walletAddress', async (req, res) => {
+    if (!dbInitialized) {
+        return res.json({
+            success: true,
+            wallet_address: req.params.walletAddress,
+            recharge_cooldown_end: new Date(Date.now() + (45 * 60 * 1000)).toISOString(),
+            time_remaining_ms: 45 * 60 * 1000,
+            time_remaining_minutes: 45,
+            lives_remaining: 0,
+            is_recharging: true
+        });
+    }
+    
+    try {
+        const walletAddress = req.params.walletAddress;
+        const cooldownMinutes = 45;
+        const cooldownEnd = new Date(Date.now() + (cooldownMinutes * 60 * 1000));
+        
+        const query = `
+            INSERT INTO recharge_tracking 
+            (wallet_address, lives_remaining, recharge_cooldown_end, is_recharging, updated_at)
+            VALUES ($1, 0, $2, true, CURRENT_TIMESTAMP)
+            ON CONFLICT (wallet_address) 
+            DO UPDATE SET 
+                lives_remaining = 0,
+                recharge_cooldown_end = $2,
+                is_recharging = true,
+                updated_at = CURRENT_TIMESTAMP
+        `;
+        
+        const client = await database.pgPool.connect();
+        await client.query(query, [walletAddress, cooldownEnd.toISOString()]);
+        client.release();
+        
+        res.json({
+            success: true,
+            wallet_address: walletAddress,
+            recharge_cooldown_end: cooldownEnd.toISOString(),
+            time_remaining_ms: cooldownMinutes * 60 * 1000,
+            time_remaining_minutes: cooldownMinutes,
+            lives_remaining: 0,
+            is_recharging: true
+        });
+    } catch (error) {
+        console.error('❌ Error starting recharge:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+app.put('/api/recharge/lives/:walletAddress', async (req, res) => {
+    if (!dbInitialized) {
+        return res.json({
+            success: true,
+            wallet_address: req.params.walletAddress,
+            lives_remaining: req.body.lives_remaining || 3
+        });
+    }
+    
+    try {
+        const walletAddress = req.params.walletAddress;
+        const { lives_remaining } = req.body;
+        
+        if (lives_remaining === undefined || lives_remaining === null) {
+            return res.status(400).json({ error: 'lives_remaining is required' });
+        }
+        
+        if (lives_remaining < 0 || lives_remaining > 3) {
+            return res.status(400).json({ error: 'Invalid lives count' });
+        }
+        
+        const query = `
+            INSERT INTO recharge_tracking 
+            (wallet_address, lives_remaining, updated_at)
+            VALUES ($1, $2, CURRENT_TIMESTAMP)
+            ON CONFLICT (wallet_address) 
+            DO UPDATE SET 
+                lives_remaining = $2,
+                updated_at = CURRENT_TIMESTAMP
+        `;
+        
+        const client = await database.pgPool.connect();
+        await client.query(query, [walletAddress, lives_remaining]);
+        client.release();
+        
+        res.json({
+            success: true,
+            wallet_address: walletAddress,
+            lives_remaining: lives_remaining
+        });
+    } catch (error) {
+        console.error('❌ Error updating lives:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
 // Simple health check for deployment
 app.get('/api/health', (req, res) => {
     res.json({ 
