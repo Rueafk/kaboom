@@ -5876,6 +5876,9 @@ window.startGame = async function() {
 	console.log('🔍 Checking wallet connection:', !!window.walletConnection);
 	console.log('🔍 Wallet connected status:', window.walletConnection?.isConnected);
 	
+	// Try to start session with retry logic
+	let sessionStarted = false;
+	
 	if (window.gameSessionManager && window.walletConnection && window.walletConnection.isConnected) {
 		const walletAddress = window.walletConnection.publicKey.toString();
 		console.log('🎮 Starting game session via GameSessionManager for wallet:', walletAddress);
@@ -5883,6 +5886,7 @@ window.startGame = async function() {
 		const sessionResult = await window.gameSessionManager.startSession(walletAddress);
 		if (sessionResult.success) {
 			console.log('✅ Game session started successfully:', sessionResult.session_id);
+			sessionStarted = true;
 		} else {
 			console.warn('⚠️ Failed to start game session:', sessionResult.error);
 		}
@@ -5892,6 +5896,20 @@ window.startGame = async function() {
 			walletConnection: !!window.walletConnection,
 			isConnected: window.walletConnection?.isConnected
 		});
+	}
+	
+	// Fallback: Try to start session after a delay if it failed
+	if (!sessionStarted && window.gameSessionManager && window.walletConnection && window.walletConnection.isConnected) {
+		console.log('🔄 Retrying session start after delay...');
+		setTimeout(async () => {
+			const walletAddress = window.walletConnection.publicKey.toString();
+			const retryResult = await window.gameSessionManager.startSession(walletAddress);
+			if (retryResult.success) {
+				console.log('✅ Game session started on retry:', retryResult.session_id);
+			} else {
+				console.warn('⚠️ Retry failed to start game session:', retryResult.error);
+			}
+		}, 2000);
 	}
 	
 	// Check if DOM is ready
