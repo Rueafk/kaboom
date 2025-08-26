@@ -791,6 +791,8 @@
             align-items: center;
             z-index: 1000;
             backdrop-filter: blur(10px);
+            /* Ensure clicks go through to children */
+            pointer-events: auto;
         }
 
         .settings-panel.show {
@@ -807,6 +809,8 @@
             max-height: 80vh;
             overflow: hidden;
             box-shadow: 0 20px 60px rgba(70, 130, 180, 0.4);
+            /* Explicitly enable pointer events inside modal */
+            pointer-events: auto;
         }
 
         .settings-header {
@@ -2224,6 +2228,11 @@
                     
                     // Load specific tab data
                     loadTabData(tabName);
+
+                    // If switching to profile tab, refresh profile values immediately
+                    if (tabName === 'profile' && typeof updateSettingsData === 'function') {
+                        updateSettingsData();
+                    }
                 });
             });
             
