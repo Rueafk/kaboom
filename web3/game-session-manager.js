@@ -387,3 +387,25 @@ window.testGameSessionManager = function() {
         console.log('⚠️ No wallet connected for testing');
     }
 };
+
+// Auto-initialization check
+window.addEventListener('load', function() {
+    console.log('🔄 Checking GameSessionManager initialization...');
+    
+    // Wait a bit for all scripts to load
+    setTimeout(() => {
+        if (typeof GameSessionManager !== 'undefined' && !window.gameSessionManager) {
+            console.log('🔧 Auto-initializing GameSessionManager...');
+            try {
+                window.gameSessionManager = new GameSessionManager();
+                console.log('✅ GameSessionManager auto-initialized');
+            } catch (error) {
+                console.error('❌ Failed to auto-initialize GameSessionManager:', error);
+            }
+        } else if (window.gameSessionManager) {
+            console.log('✅ GameSessionManager already initialized');
+        } else {
+            console.error('❌ GameSessionManager not available');
+        }
+    }, 2000);
+});
