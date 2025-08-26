@@ -356,6 +356,8 @@ app.get('/api/players', (req, res) => {
 
 // Enhanced player creation/update
 app.post('/api/players', (req, res) => {
+    console.log('🔍 POST /api/players called with body:', req.body);
+    
     const { 
         wallet_address, 
         username, 
@@ -371,6 +373,22 @@ app.post('/api/players', (req, res) => {
         total_bombs_used = 0
     } = req.body;
     
+    // Validate required fields
+    if (!wallet_address) {
+        console.error('❌ Missing wallet_address in request');
+        return res.status(400).json({ error: 'wallet_address is required' });
+    }
+    
+    console.log('📝 Processing player data:', {
+        wallet_address,
+        username,
+        level,
+        total_score,
+        boom_tokens,
+        lives,
+        current_score
+    });
+    
     const query = `
         INSERT OR REPLACE INTO players 
         (wallet_address, username, level, total_score, boom_tokens, lives, current_score, 
@@ -379,12 +397,24 @@ app.post('/api/players', (req, res) => {
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
     `;
     
-    db.run(query, [wallet_address, username, level, total_score, boom_tokens, lives, current_score,
-                   experience_points, games_played, games_won, total_enemies_killed, total_bombs_used], function(err) {
+    const params = [wallet_address, username, level, total_score, boom_tokens, lives, current_score,
+                   experience_points, games_played, games_won, total_enemies_killed, total_bombs_used];
+    
+    console.log('🔍 Executing query with params:', params);
+    
+    db.run(query, params, function(err) {
         if (err) {
-            res.status(500).json({ error: err.message });
+            console.error('❌ Database error in POST /api/players:', err);
+            console.error('❌ Error details:', {
+                code: err.code,
+                message: err.message,
+                stack: err.stack
+            });
+            res.status(500).json({ error: err.message, details: err.code });
             return;
         }
+        
+        console.log('✅ Player data saved successfully, lastID:', this.lastID);
         
         // Check for achievements
         checkAndAwardAchievements(wallet_address);
@@ -399,8 +429,18 @@ app.post('/api/players', (req, res) => {
 
 // Start game session
 app.post('/api/sessions/start', (req, res) => {
+    console.log('🔍 POST /api/sessions/start called with body:', req.body);
+    
     const { wallet_address } = req.body;
+    
+    // Validate required fields
+    if (!wallet_address) {
+        console.error('❌ Missing wallet_address in request');
+        return res.status(400).json({ error: 'wallet_address is required' });
+    }
+    
     const sessionId = generateSessionId();
+    console.log('🎮 Starting session for wallet:', wallet_address, 'with session ID:', sessionId);
     
     const query = `
         INSERT INTO game_sessions 
@@ -410,9 +450,17 @@ app.post('/api/sessions/start', (req, res) => {
     
     db.run(query, [wallet_address, sessionId], function(err) {
         if (err) {
-            res.status(500).json({ error: err.message });
+            console.error('❌ Database error in POST /api/sessions/start:', err);
+            console.error('❌ Error details:', {
+                code: err.code,
+                message: err.message,
+                stack: err.stack
+            });
+            res.status(500).json({ error: err.message, details: err.code });
             return;
         }
+        
+        console.log('✅ Game session started successfully, session ID:', sessionId);
         
         res.json({
             success: true,
@@ -837,13 +885,31 @@ app.post('/api/recharge/complete/:walletAddress', (req, res) => {
 
 // Update lives remaining (called when player takes damage)
 app.put('/api/recharge/lives/:walletAddress', (req, res) => {
+    console.log('🔍 PUT /api/recharge/lives/:walletAddress called');
+    console.log('🔍 Wallet address:', req.params.walletAddress);
+    console.log('🔍 Request body:', req.body);
+    
     const walletAddress = req.params.walletAddress;
     const { lives_remaining } = req.body;
     
+    // Validate required fields
+    if (!walletAddress) {
+        console.error('❌ Missing wallet_address in params');
+        return res.status(400).json({ error: 'wallet_address is required' });
+    }
+    
+    if (lives_remaining === undefined || lives_remaining === null) {
+        console.error('❌ Missing lives_remaining in body');
+        return res.status(400).json({ error: 'lives_remaining is required' });
+    }
+    
     if (lives_remaining < 0 || lives_remaining > 3) {
+        console.error('❌ Invalid lives count:', lives_remaining);
         res.status(400).json({ error: 'Invalid lives count' });
         return;
     }
+    
+    console.log('📝 Updating lives for wallet:', walletAddress, 'to:', lives_remaining);
     
     const query = `
         INSERT OR REPLACE INTO recharge_tracking 
@@ -853,9 +919,17 @@ app.put('/api/recharge/lives/:walletAddress', (req, res) => {
     
     db.run(query, [walletAddress, lives_remaining], function(err) {
         if (err) {
-            res.status(500).json({ error: err.message });
+            console.error('❌ Database error in PUT /api/recharge/lives/:walletAddress:', err);
+            console.error('❌ Error details:', {
+                code: err.code,
+                message: err.message,
+                stack: err.stack
+            });
+            res.status(500).json({ error: err.message, details: err.code });
             return;
         }
+        
+        console.log('✅ Lives updated successfully for wallet:', walletAddress);
         
         res.json({
             success: true,

@@ -64,39 +64,8 @@ class PlayerDataManager {
         }
     }
     
-    async updatePlayerProgress(walletAddress, progress) {
-        if (!this.isConnected) {
-            console.warn('⚠️ Database offline, updating localStorage only');
-            return { success: false, error: 'Database offline' };
-        }
-        
-        try {
-            const response = await fetch(`${this.apiBase}/players/${walletAddress}/progress`, {
-                method: 'PUT',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
-                    level: progress.level || 1,
-                    total_score: progress.totalScore || 0,
-                    boom_tokens: progress.boomTokens || 0,
-                    lives: progress.lives || 3,
-                    current_score: progress.currentScore || 0
-                })
-            });
-            
-            if (response.ok) {
-                const result = await response.json();
-                console.log('✅ Player progress updated in database:', result);
-                return { success: true, data: result };
-            } else {
-                throw new Error(`Server error: ${response.status}`);
-            }
-        } catch (error) {
-            console.error('❌ Error updating progress:', error);
-            return { success: false, error: error.message };
-        }
-    }
+    // REMOVED: updatePlayerProgress function - this endpoint doesn't exist in the backend
+    // Use GameSessionManager for real-time data updates instead
     
     async loadPlayerProfile(walletAddress) {
         if (!this.isConnected) {
