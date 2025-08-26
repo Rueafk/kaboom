@@ -6,7 +6,7 @@ const crypto = require('crypto');
 const database = require('./database');
 
 const app = express();
-const PORT = process.env.PORT || 8080;
+const PORT = process.env.PORT || 8000;
 const NODE_ENV = process.env.NODE_ENV || 'development';
 
 // Enhanced middleware with security
@@ -35,6 +35,15 @@ app.get('/admin', (req, res) => {
 });
 
 app.use(express.static('.'));
+
+// Simple test endpoint
+app.get('/test', (req, res) => {
+    res.json({ 
+        message: 'Server is running!',
+        timestamp: new Date().toISOString(),
+        port: PORT
+    });
+});
 
 // Initialize PostgreSQL and Redis
 let dbInitialized = false;
@@ -220,8 +229,18 @@ app.get('/api/players/:walletAddress/sessions', async (req, res) => {
     }
 });
 
-// Health check with detailed status
-app.get('/api/health', async (req, res) => {
+// Simple health check for deployment
+app.get('/api/health', (req, res) => {
+    res.json({ 
+        status: 'healthy',
+        timestamp: new Date().toISOString(),
+        uptime: process.uptime(),
+        port: PORT
+    });
+});
+
+// Detailed health check with database
+app.get('/api/health/detailed', async (req, res) => {
     try {
         const health = await database.healthCheck();
         const players = await database.getAllPlayers(1, 0);
@@ -271,20 +290,28 @@ async function completeExpiredRecharges() {
 }
 
 // Start server with enhanced logging
-app.listen(PORT, () => {
+const server = app.listen(PORT, () => {
     console.log(`🚀 Enhanced Kaboom Server running on port ${PORT}`);
     console.log(`📊 Admin Dashboard: http://localhost:${PORT}/admin-dashboard.html`);
     console.log(`🔍 Simple Admin Panel: http://localhost:${PORT}/admin-panel.html`);
     console.log(`🎯 Game: http://localhost:${PORT}/`);
-    console.log(`📈 Analytics: http://localhost:${PORT}/api/analytics/dashboard`);
-    console.log(`🏆 Leaderboards: http://localhost:${PORT}/api/leaderboards/score`);
     console.log(`⚡ Health Check: http://localhost:${PORT}/api/health`);
+    console.log(`🧪 Test Endpoint: http://localhost:${PORT}/test`);
     
     // Complete any expired recharges on server start
     completeExpiredRecharges();
     
     // Check for expired recharges every 5 minutes
     setInterval(completeExpiredRecharges, 5 * 60 * 1000);
+});
+
+// Handle server errors
+server.on('error', (error) => {
+    console.error('❌ Server error:', error);
+    if (error.code === 'EADDRINUSE') {
+        console.error(`❌ Port ${PORT} is already in use`);
+        process.exit(1);
+    }
 });
 
 // Graceful shutdown with enhanced cleanup
