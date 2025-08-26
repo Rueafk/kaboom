@@ -302,6 +302,10 @@
             console.log('🔄 Refreshing worldwide dashboard data...');
             
             try {
+                console.log('🔍 Testing API endpoints...');
+                console.log('🔗 Health endpoint:', `${API_BASE}/health`);
+                console.log('🔗 Players endpoint:', `${API_BASE}/players`);
+                
                 // Get server health
                 await updateServerStatus();
                 
@@ -312,7 +316,7 @@
                 document.querySelector('.header p').textContent = 
                     `Worldwide Real-time Game Monitoring - Last updated: ${new Date().toLocaleTimeString()}`;
                     
-                            } catch (error) {
+            } catch (error) {
                 console.error('❌ Error refreshing data:', error);
                 showError('Failed to refresh data: ' + error.message);
             }
@@ -321,8 +325,16 @@
         // Update server status
         async function updateServerStatus() {
             try {
+                console.log('🔍 Fetching server health...');
                 const response = await fetch(`${API_BASE}/health`);
+                console.log('🔍 Health response status:', response.status);
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                
                 const data = await response.json();
+                console.log('🔍 Health data:', data);
                 
                 const statusElement = document.getElementById('serverStatus');
                 if (data.status === 'healthy') {
@@ -334,6 +346,7 @@
                 }
                 
             } catch (error) {
+                console.error('❌ Health check failed:', error);
                 document.getElementById('serverStatus').innerHTML = 
                     '<span class="status-indicator status-offline"></span>Error';
                 document.getElementById('serverStatus').style.color = '#ff4444';
@@ -344,13 +357,22 @@
         // Update players data
         async function updatePlayersData() {
             try {
+                console.log('🔍 Fetching players data...');
                 const response = await fetch(`${API_BASE}/players`);
+                console.log('🔍 Players response status:', response.status);
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                
                 const data = await response.json();
+                console.log('🔍 Players data:', data);
                 
                 const players = data.players || [];
                 
                 // Check if we're in fallback mode
                 if (data.message && data.message.includes('fallback mode')) {
+                    console.log('⚠️ Running in fallback mode - no database available');
                     document.getElementById('totalPlayers').textContent = '⚠️ Fallback Mode';
                     document.getElementById('totalScore').textContent = '⚠️ No Database';
                     document.getElementById('totalTokens').textContent = '⚠️ No Database';
