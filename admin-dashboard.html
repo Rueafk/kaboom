@@ -144,6 +144,16 @@
             color: #ffd700;
         }
         
+        .error-message {
+            text-align: center;
+            padding: 20px;
+            color: #ff6b6b;
+            background: rgba(255, 107, 107, 0.1);
+            border: 1px solid rgba(255, 107, 107, 0.3);
+            border-radius: 10px;
+            font-weight: bold;
+        }
+        
         .error {
             background: rgba(255, 68, 68, 0.2);
             color: #ff4444;
@@ -338,6 +348,19 @@
                 const data = await response.json();
                 
                 const players = data.players || [];
+                
+                // Check if we're in fallback mode
+                if (data.message && data.message.includes('fallback mode')) {
+                    document.getElementById('totalPlayers').textContent = '⚠️ Fallback Mode';
+                    document.getElementById('totalScore').textContent = '⚠️ No Database';
+                    document.getElementById('totalTokens').textContent = '⚠️ No Database';
+                    document.getElementById('gamesPlayed').textContent = '⚠️ No Database';
+                    document.getElementById('enemiesKilled').textContent = '⚠️ No Database';
+                    
+                    document.getElementById('playersTable').innerHTML = 
+                        '<div class="error-message">⚠️ Database not available - Running in fallback mode. Player data is not being persisted.</div>';
+                    return;
+                }
                 
                 // Update stats
                 updateStats(players);
