@@ -12,7 +12,7 @@ const NODE_ENV = process.env.NODE_ENV || 'development';
 // Enhanced middleware with security
 const allowedOrigins = NODE_ENV === 'production' 
     ? ['https://kaboom-game.koyeb.app', 'https://kaboom-game-rueafk.koyeb.app', 'https://favourable-elicia-afk-a1f42961.koyeb.app']
-    : ['http://localhost:3000', 'http://127.0.0.1:3000'];
+    : ['http://localhost:3000', 'http://127.0.0.1:3000', 'null', 'file://'];
 
 app.use(cors({
     origin: function (origin, callback) {
