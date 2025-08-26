@@ -2278,6 +2278,20 @@ class PirateBombGame {
 			return;
 		}
 		
+		// End game session with GameSessionManager
+		if (window.gameSessionManager && window.gameSessionManager.isSessionActive()) {
+			console.log('🏁 Ending game session via GameSessionManager...');
+			window.gameSessionManager.onPlayerDeath().then(result => {
+				if (result.success) {
+					console.log('✅ Game session ended successfully:', result.data);
+				} else {
+					console.warn('⚠️ Failed to end game session:', result.error);
+				}
+			}).catch(error => {
+				console.error('❌ Error ending game session:', error);
+			});
+		}
+		
 		const gameOverScreen = document.getElementById('gameOver');
 		const finalScore = document.getElementById('finalScore');
 		
@@ -2485,6 +2499,16 @@ class PirateBombGame {
 		this.gameState.currentScore += levelCompletionPoints;
 		this.gameState.totalScore += levelCompletionPoints;
 		console.log(`🎮 Level ${completedLevel} completed - +${levelCompletionPoints} points! Current score: ${this.gameState.currentScore}, Total score: ${this.gameState.totalScore}`);
+		
+		// Update GameSessionManager with level completion
+		if (window.gameSessionManager && window.gameSessionManager.isSessionActive()) {
+			window.gameSessionManager.onLevelComplete(completedLevel);
+			window.gameSessionManager.onScoreEarned(levelCompletionPoints);
+			
+			// Calculate and track tokens earned (10% of score)
+			const tokensEarned = Math.floor(levelCompletionPoints * 0.10);
+			window.gameSessionManager.onTokensEarned(tokensEarned);
+		}
 		
 		// IMMEDIATELY save to localStorage first
 		if (window.walletConnection && window.walletConnection.publicKey) {
@@ -3635,6 +3659,11 @@ class Player {
 			// Debug: Log bomb placement
 			console.log(`Bomb placed at (${bombX}, ${bombY}) - Fuse: ${newBomb.fuseTimer}ms`);
 			
+			// Update GameSessionManager with bomb usage
+			if (window.gameSessionManager && window.gameSessionManager.isSessionActive()) {
+				window.gameSessionManager.onBombUsed();
+			}
+			
 			if (game.soundManager) game.soundManager.play('bomb');
 			return true; 
 		}
@@ -4750,6 +4779,16 @@ class Enemy {
 				game.gameState.totalScore += enemyKillPoints;
 				console.log(`💀 Enemy killed: ${this.type} - +${enemyKillPoints} points! Current score: ${game.gameState.currentScore}, Total score: ${game.gameState.totalScore}`);
 				
+				// Update GameSessionManager with enemy kill
+				if (window.gameSessionManager && window.gameSessionManager.isSessionActive()) {
+					window.gameSessionManager.onEnemyKilled();
+					window.gameSessionManager.onScoreEarned(enemyKillPoints);
+					
+					// Calculate and track tokens earned (10% of score)
+					const tokensEarned = Math.floor(enemyKillPoints * 0.10);
+					window.gameSessionManager.onTokensEarned(tokensEarned);
+				}
+				
 				// IMMEDIATELY save to localStorage when score changes
 				if (window.walletConnection && window.walletConnection.publicKey) {
 					const progress = {
@@ -5811,6 +5850,19 @@ window.startGame = async function() {
 		// Notify recharge system that game is starting
 		await window.rechargeManager.onGameStart();
 		console.log('✅ Recharge system approved game start');
+	}
+	
+	// Start game session with GameSessionManager
+	if (window.gameSessionManager && window.walletConnection && window.walletConnection.isConnected) {
+		const walletAddress = window.walletConnection.publicKey.toString();
+		console.log('🎮 Starting game session via GameSessionManager...');
+		
+		const sessionResult = await window.gameSessionManager.startSession(walletAddress);
+		if (sessionResult.success) {
+			console.log('✅ Game session started successfully:', sessionResult.session_id);
+		} else {
+			console.warn('⚠️ Failed to start game session:', sessionResult.error);
+		}
 	}
 	
 	// Check if DOM is ready

@@ -1825,8 +1825,9 @@
     <script src="web3/wallet-connection.js"></script>
     <script src="web3/reward-system.js"></script>
     <script src="web3/player-registry-client.js"></script>
-    <script src="web3/player-data-manager.js"></script>
-    <script src="web3/recharge-manager.js"></script>
+    	<script src="web3/player-data-manager.js"></script>
+	<script src="web3/recharge-manager.js"></script>
+	<script src="web3/game-session-manager.js"></script>
     
     <script>
         // Immediate debugging
@@ -1895,6 +1896,23 @@
                     }
                 } else {
                     console.error('❌ PlayerDataManager is not defined!');
+                }
+                
+                // Initialize Game Session Manager for real-time data synchronization
+                console.log('🔍 Checking GameSessionManager availability...');
+                console.log('GameSessionManager type:', typeof GameSessionManager);
+                console.log('GameSessionManager value:', GameSessionManager);
+                
+                if (typeof GameSessionManager !== 'undefined') {
+                    try {
+                        window.gameSessionManager = new GameSessionManager();
+                        console.log('✅ Game Session Manager initialized for real-time data sync');
+                        console.log('window.gameSessionManager:', window.gameSessionManager);
+                    } catch (error) {
+                        console.error('❌ Error initializing GameSessionManager:', error);
+                    }
+                } else {
+                    console.error('❌ GameSessionManager is not defined!');
                 }
                 
                 // Initialize RechargeManager if wallet is already connected
