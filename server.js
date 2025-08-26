@@ -3,7 +3,7 @@ const path = require('path');
 const cors = require('cors');
 const bodyParser = require('body-parser');
 const crypto = require('crypto');
-const database = require('./database');
+const sqlite3 = require('sqlite3').verbose();
 
 const app = express();
 const PORT = process.env.PORT || 8000;
@@ -45,30 +45,91 @@ app.get('/test', (req, res) => {
     });
 });
 
-// Initialize PostgreSQL and Redis
+// Initialize SQLite database
+let db = null;
 let dbInitialized = false;
 
-async function initializeServer() {
-    try {
-        console.log('🚀 Initializing PostgreSQL and Redis...');
-        dbInitialized = await database.initializeDatabase();
-        
-        if (dbInitialized) {
-            console.log('✅ Database initialization successful');
-        } else {
-            console.warn('⚠️ Database initialization failed - running in fallback mode');
-            dbInitialized = false;
-        }
-    } catch (error) {
-        console.warn('⚠️ Database connection failed - running in fallback mode:', error.message);
-        dbInitialized = false;
-    }
+function initializeDatabase() {
+    return new Promise((resolve, reject) => {
+        db = new sqlite3.Database('./kaboom_game.db', (err) => {
+            if (err) {
+                console.error('❌ Database connection failed:', err.message);
+                reject(err);
+                return;
+            }
+            
+            console.log('✅ SQLite database connected');
+            
+            // Create tables
+            db.serialize(() => {
+                // Players table
+                db.run(`CREATE TABLE IF NOT EXISTS players (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    wallet_address TEXT UNIQUE NOT NULL,
+                    username TEXT,
+                    level INTEGER DEFAULT 1,
+                    total_score INTEGER DEFAULT 0,
+                    boom_tokens INTEGER DEFAULT 0,
+                    lives INTEGER DEFAULT 3,
+                    current_score INTEGER DEFAULT 0,
+                    experience_points INTEGER DEFAULT 0,
+                    achievements_unlocked INTEGER DEFAULT 0,
+                    total_playtime_minutes INTEGER DEFAULT 0,
+                    games_played INTEGER DEFAULT 0,
+                    games_won INTEGER DEFAULT 0,
+                    highest_level_reached INTEGER DEFAULT 1,
+                    longest_survival_time INTEGER DEFAULT 0,
+                    total_enemies_killed INTEGER DEFAULT 0,
+                    total_bombs_used INTEGER DEFAULT 0,
+                    last_updated DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    last_login DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    is_banned BOOLEAN DEFAULT 0,
+                    ban_reason TEXT,
+                    cheat_score REAL DEFAULT 0.0
+                )`);
+                
+                // Game sessions table
+                db.run(`CREATE TABLE IF NOT EXISTS game_sessions (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    wallet_address TEXT NOT NULL,
+                    session_id TEXT UNIQUE NOT NULL,
+                    session_start DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    session_end DATETIME,
+                    final_score INTEGER DEFAULT 0,
+                    enemies_killed INTEGER DEFAULT 0,
+                    bombs_used INTEGER DEFAULT 0,
+                    is_valid BOOLEAN DEFAULT 1,
+                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+                )`);
+                
+                // Recharge tracking table
+                db.run(`CREATE TABLE IF NOT EXISTS recharge_tracking (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    wallet_address TEXT UNIQUE NOT NULL,
+                    lives_remaining INTEGER DEFAULT 3,
+                    is_recharging BOOLEAN DEFAULT 0,
+                    recharge_cooldown_end DATETIME,
+                    total_recharges INTEGER DEFAULT 0,
+                    last_recharge_time DATETIME,
+                    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+                )`);
+                
+                console.log('✅ Database tables created');
+                dbInitialized = true;
+                resolve(true);
+            });
+        });
+    });
 }
 
-// Initialize server on startup
-initializeServer();
+// Initialize database on startup
+initializeDatabase().catch(err => {
+    console.error('❌ Database initialization failed:', err);
+    dbInitialized = false;
+});
 
-// Enhanced API endpoints with PostgreSQL
+// Enhanced API endpoints with SQLite
 
 // Get all players with pagination and search
 app.get('/api/players', async (req, res) => {
@@ -81,7 +142,7 @@ app.get('/api/players', async (req, res) => {
                 total: 0,
                 pages: 0
             },
-            message: 'Database not available - running in fallback mode'
+            message: 'Database not available'
         });
     }
     
@@ -92,45 +153,47 @@ app.get('/api/players', async (req, res) => {
         
         const offset = (page - 1) * limit;
         
-        let query = `
-            SELECT * FROM players 
-            WHERE 1=1
-        `;
+        let query = `SELECT * FROM players WHERE 1=1`;
         let countQuery = `SELECT COUNT(*) as total FROM players WHERE 1=1`;
         let params = [];
         
         if (search) {
-            query += ` AND (username ILIKE $1 OR wallet_address ILIKE $1)`;
-            countQuery += ` AND (username ILIKE $1 OR wallet_address ILIKE $1)`;
-            params.push(`%${search}%`);
+            query += ` AND (username LIKE ? OR wallet_address LIKE ?)`;
+            countQuery += ` AND (username LIKE ? OR wallet_address LIKE ?)`;
+            params.push(`%${search}%`, `%${search}%`);
         }
         
-        query += ` ORDER BY total_score DESC LIMIT $${params.length + 1} OFFSET $${params.length + 2}`;
+        query += ` ORDER BY total_score DESC LIMIT ? OFFSET ?`;
         params.push(limit, offset);
         
-        const client = await database.pgPool.connect();
-        
-        const [result, countResult] = await Promise.all([
-            client.query(query, params),
-            client.query(countQuery, search ? [`%${search}%`] : [])
-        ]);
-        
-        client.release();
-        
-        const total = parseInt(countResult.rows[0].total);
-        const pages = Math.ceil(total / limit);
-        
-        res.json({
-            players: result.rows,
-            pagination: {
-                page,
-                limit,
-                total,
-                pages
+        db.all(query, params, (err, rows) => {
+            if (err) {
+                console.error('❌ Error fetching players:', err);
+                return res.status(500).json({ error: err.message });
             }
+            
+            db.get(countQuery, search ? [`%${search}%`, `%${search}%`] : [], (err, countResult) => {
+                if (err) {
+                    console.error('❌ Error counting players:', err);
+                    return res.status(500).json({ error: err.message });
+                }
+                
+                const total = countResult.total;
+                const pages = Math.ceil(total / limit);
+                
+                res.json({
+                    players: rows,
+                    pagination: {
+                        page,
+                        limit,
+                        total,
+                        pages
+                    }
+                });
+            });
         });
     } catch (error) {
-        console.error('❌ Error fetching players:', error);
+        console.error('❌ Error in players endpoint:', error);
         res.status(500).json({ error: error.message });
     }
 });
@@ -152,16 +215,49 @@ app.post('/api/players', async (req, res) => {
             return res.status(400).json({ error: 'Wallet address is required' });
         }
         
-        const savedPlayer = await database.savePlayer(playerData);
-        await database.updateLeaderboard(playerData.wallet_address, playerData.total_score || 0);
+        const query = `
+            INSERT OR REPLACE INTO players (
+                wallet_address, username, level, total_score, boom_tokens, lives,
+                current_score, experience_points, achievements_unlocked,
+                total_playtime_minutes, games_played, games_won,
+                highest_level_reached, longest_survival_time,
+                total_enemies_killed, total_bombs_used, last_updated
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+        `;
         
-        res.json({
-            success: true,
-            message: 'Player data saved successfully',
-            id: savedPlayer.id
+        const params = [
+            playerData.wallet_address,
+            playerData.username || 'Player',
+            playerData.level || 1,
+            playerData.total_score || 0,
+            playerData.boom_tokens || 0,
+            playerData.lives || 3,
+            playerData.current_score || 0,
+            playerData.experience_points || 0,
+            playerData.achievements_unlocked || 0,
+            playerData.total_playtime_minutes || 0,
+            playerData.games_played || 0,
+            playerData.games_won || 0,
+            playerData.highest_level_reached || 1,
+            playerData.longest_survival_time || 0,
+            playerData.total_enemies_killed || 0,
+            playerData.total_bombs_used || 0
+        ];
+        
+        db.run(query, params, function(err) {
+            if (err) {
+                console.error('❌ Error saving player:', err);
+                return res.status(500).json({ error: err.message });
+            }
+            
+            res.json({
+                success: true,
+                message: 'Player data saved successfully',
+                id: this.lastID
+            });
         });
     } catch (error) {
-        console.error('❌ Error saving player:', error);
+        console.error('❌ Error in save player endpoint:', error);
         res.status(500).json({ error: error.message });
     }
 });
@@ -176,21 +272,27 @@ app.get('/api/players/:walletAddress', async (req, res) => {
             total_score: 0,
             boom_tokens: 0,
             lives: 3,
-            message: 'Database not available - running in fallback mode'
+            message: 'Database not available'
         });
     }
     
     try {
         const walletAddress = req.params.walletAddress;
-        const player = await database.getPlayer(walletAddress);
         
-        if (!player) {
-            return res.status(404).json({ error: 'Player not found' });
-        }
-        
-        res.json(player);
+        db.get('SELECT * FROM players WHERE wallet_address = ?', [walletAddress], (err, row) => {
+            if (err) {
+                console.error('❌ Error fetching player:', err);
+                return res.status(500).json({ error: err.message });
+            }
+            
+            if (!row) {
+                return res.status(404).json({ error: 'Player not found' });
+            }
+            
+            res.json(row);
+        });
     } catch (error) {
-        console.error('❌ Error fetching player:', error);
+        console.error('❌ Error in get player endpoint:', error);
         res.status(500).json({ error: error.message });
     }
 });
@@ -212,15 +314,22 @@ app.post('/api/sessions/start', async (req, res) => {
             return res.status(400).json({ error: 'Wallet address and session ID are required' });
         }
         
-        const session = await database.createSession(wallet_address, session_id);
+        const query = `INSERT INTO game_sessions (wallet_address, session_id) VALUES (?, ?)`;
         
-        res.json({
-            success: true,
-            session_id: session.session_id,
-            message: 'Game session started'
+        db.run(query, [wallet_address, session_id], function(err) {
+            if (err) {
+                console.error('❌ Error starting session:', err);
+                return res.status(500).json({ error: err.message });
+            }
+            
+            res.json({
+                success: true,
+                session_id: session_id,
+                message: 'Game session started'
+            });
         });
     } catch (error) {
-        console.error('❌ Error starting session:', error);
+        console.error('❌ Error in start session endpoint:', error);
         res.status(500).json({ error: error.message });
     }
 });
@@ -242,15 +351,29 @@ app.post('/api/sessions/end', async (req, res) => {
             return res.status(400).json({ error: 'Wallet address and session ID are required' });
         }
         
-        const session = await database.endSession(wallet_address, session_id, final_score, enemies_killed, bombs_used);
+        const query = `
+            UPDATE game_sessions 
+            SET session_end = CURRENT_TIMESTAMP,
+                final_score = ?,
+                enemies_killed = ?,
+                bombs_used = ?
+            WHERE session_id = ? AND wallet_address = ?
+        `;
         
-        res.json({
-            success: true,
-            message: 'Game session ended',
-            session: session
+        db.run(query, [final_score || 0, enemies_killed || 0, bombs_used || 0, session_id, wallet_address], function(err) {
+            if (err) {
+                console.error('❌ Error ending session:', err);
+                return res.status(500).json({ error: err.message });
+            }
+            
+            res.json({
+                success: true,
+                message: 'Game session ended',
+                session: { session_id: session_id }
+            });
         });
     } catch (error) {
-        console.error('❌ Error ending session:', error);
+        console.error('❌ Error in end session endpoint:', error);
         res.status(500).json({ error: error.message });
     }
 });
@@ -263,21 +386,25 @@ app.get('/api/players/:walletAddress/sessions', async (req, res) => {
     
     try {
         const walletAddress = req.params.walletAddress;
-        const { limit = 10 } = req.query;
+        const limit = parseInt(req.query.limit) || 10;
         
         const query = `
             SELECT * FROM game_sessions 
-            WHERE wallet_address = $1 AND is_valid = true
+            WHERE wallet_address = ? AND is_valid = 1
             ORDER BY session_start DESC 
-            LIMIT $2
+            LIMIT ?
         `;
         
-        const client = await database.pgPool.connect();
-        const result = await client.query(query, [walletAddress, limit]);
-        client.release();
-        
-        res.json(result.rows);
+        db.all(query, [walletAddress, limit], (err, rows) => {
+            if (err) {
+                console.error('❌ Error fetching sessions:', err);
+                return res.status(500).json({ error: err.message });
+            }
+            
+            res.json(rows);
+        });
     } catch (error) {
+        console.error('❌ Error in sessions endpoint:', error);
         res.status(500).json({ error: error.message });
     }
 });
@@ -300,45 +427,46 @@ app.get('/api/recharge/:walletAddress', async (req, res) => {
     
     try {
         const walletAddress = req.params.walletAddress;
-        const query = `SELECT * FROM recharge_tracking WHERE wallet_address = $1`;
         
-        const client = await database.pgPool.connect();
-        const result = await client.query(query, [walletAddress]);
-        client.release();
-        
-        if (result.rows.length > 0) {
-            const row = result.rows[0];
-            const now = new Date();
-            const cooldownEnd = row.recharge_cooldown_end ? new Date(row.recharge_cooldown_end) : null;
-            const isRecharging = cooldownEnd && now < cooldownEnd;
-            const timeRemaining = isRecharging ? Math.max(0, cooldownEnd - now) : 0;
+        db.get('SELECT * FROM recharge_tracking WHERE wallet_address = ?', [walletAddress], (err, row) => {
+            if (err) {
+                console.error('❌ Error fetching recharge status:', err);
+                return res.status(500).json({ error: err.message });
+            }
             
-            res.json({
-                wallet_address: row.wallet_address,
-                lives_remaining: row.lives_remaining,
-                is_recharging: isRecharging,
-                time_remaining_ms: timeRemaining,
-                time_remaining_minutes: Math.ceil(timeRemaining / (1000 * 60)),
-                can_play: !isRecharging && row.lives_remaining > 0,
-                total_recharges: row.total_recharges,
-                last_recharge_time: row.last_recharge_time,
-                recharge_cooldown_end: row.recharge_cooldown_end
-            });
-        } else {
-            res.json({
-                wallet_address: walletAddress,
-                lives_remaining: 3,
-                is_recharging: false,
-                time_remaining_ms: 0,
-                time_remaining_minutes: 0,
-                can_play: true,
-                total_recharges: 0,
-                last_recharge_time: null,
-                recharge_cooldown_end: null
-            });
-        }
+            if (row) {
+                const now = new Date();
+                const cooldownEnd = row.recharge_cooldown_end ? new Date(row.recharge_cooldown_end) : null;
+                const isRecharging = cooldownEnd && now < cooldownEnd;
+                const timeRemaining = isRecharging ? Math.max(0, cooldownEnd - now) : 0;
+                
+                res.json({
+                    wallet_address: row.wallet_address,
+                    lives_remaining: row.lives_remaining,
+                    is_recharging: isRecharging,
+                    time_remaining_ms: timeRemaining,
+                    time_remaining_minutes: Math.ceil(timeRemaining / (1000 * 60)),
+                    can_play: !isRecharging && row.lives_remaining > 0,
+                    total_recharges: row.total_recharges,
+                    last_recharge_time: row.last_recharge_time,
+                    recharge_cooldown_end: row.recharge_cooldown_end
+                });
+            } else {
+                res.json({
+                    wallet_address: walletAddress,
+                    lives_remaining: 3,
+                    is_recharging: false,
+                    time_remaining_ms: 0,
+                    time_remaining_minutes: 0,
+                    can_play: true,
+                    total_recharges: 0,
+                    last_recharge_time: null,
+                    recharge_cooldown_end: null
+                });
+            }
+        });
     } catch (error) {
-        console.error('❌ Error fetching recharge status:', error);
+        console.error('❌ Error in recharge endpoint:', error);
         res.status(500).json({ error: error.message });
     }
 });
@@ -362,32 +490,29 @@ app.post('/api/recharge/start/:walletAddress', async (req, res) => {
         const cooldownEnd = new Date(Date.now() + (cooldownMinutes * 60 * 1000));
         
         const query = `
-            INSERT INTO recharge_tracking 
+            INSERT OR REPLACE INTO recharge_tracking 
             (wallet_address, lives_remaining, recharge_cooldown_end, is_recharging, updated_at)
-            VALUES ($1, 0, $2, true, CURRENT_TIMESTAMP)
-            ON CONFLICT (wallet_address) 
-            DO UPDATE SET 
-                lives_remaining = 0,
-                recharge_cooldown_end = $2,
-                is_recharging = true,
-                updated_at = CURRENT_TIMESTAMP
+            VALUES (?, 0, ?, 1, CURRENT_TIMESTAMP)
         `;
         
-        const client = await database.pgPool.connect();
-        await client.query(query, [walletAddress, cooldownEnd.toISOString()]);
-        client.release();
-        
-        res.json({
-            success: true,
-            wallet_address: walletAddress,
-            recharge_cooldown_end: cooldownEnd.toISOString(),
-            time_remaining_ms: cooldownMinutes * 60 * 1000,
-            time_remaining_minutes: cooldownMinutes,
-            lives_remaining: 0,
-            is_recharging: true
+        db.run(query, [walletAddress, cooldownEnd.toISOString()], function(err) {
+            if (err) {
+                console.error('❌ Error starting recharge:', err);
+                return res.status(500).json({ error: err.message });
+            }
+            
+            res.json({
+                success: true,
+                wallet_address: walletAddress,
+                recharge_cooldown_end: cooldownEnd.toISOString(),
+                time_remaining_ms: cooldownMinutes * 60 * 1000,
+                time_remaining_minutes: cooldownMinutes,
+                lives_remaining: 0,
+                is_recharging: true
+            });
         });
     } catch (error) {
-        console.error('❌ Error starting recharge:', error);
+        console.error('❌ Error in start recharge endpoint:', error);
         res.status(500).json({ error: error.message });
     }
 });
@@ -414,26 +539,25 @@ app.put('/api/recharge/lives/:walletAddress', async (req, res) => {
         }
         
         const query = `
-            INSERT INTO recharge_tracking 
+            INSERT OR REPLACE INTO recharge_tracking 
             (wallet_address, lives_remaining, updated_at)
-            VALUES ($1, $2, CURRENT_TIMESTAMP)
-            ON CONFLICT (wallet_address) 
-            DO UPDATE SET 
-                lives_remaining = $2,
-                updated_at = CURRENT_TIMESTAMP
+            VALUES (?, ?, CURRENT_TIMESTAMP)
         `;
         
-        const client = await database.pgPool.connect();
-        await client.query(query, [walletAddress, lives_remaining]);
-        client.release();
-        
-        res.json({
-            success: true,
-            wallet_address: walletAddress,
-            lives_remaining: lives_remaining
+        db.run(query, [walletAddress, lives_remaining], function(err) {
+            if (err) {
+                console.error('❌ Error updating lives:', err);
+                return res.status(500).json({ error: err.message });
+            }
+            
+            res.json({
+                success: true,
+                wallet_address: walletAddress,
+                lives_remaining: lives_remaining
+            });
         });
     } catch (error) {
-        console.error('❌ Error updating lives:', error);
+        console.error('❌ Error in update lives endpoint:', error);
         res.status(500).json({ error: error.message });
     }
 });
@@ -452,14 +576,33 @@ app.get('/api/health', (req, res) => {
 // Detailed health check with database
 app.get('/api/health/detailed', async (req, res) => {
     try {
-        const health = await database.healthCheck();
-        const players = await database.getAllPlayers(1, 0);
+        if (!dbInitialized) {
+            return res.json({
+                status: 'unhealthy',
+                timestamp: new Date().toISOString(),
+                database: 'not_connected',
+                error: 'Database not initialized'
+            });
+        }
         
-        res.json({ 
-            ...health,
-            timestamp: new Date().toISOString(),
-            player_count: players.length,
-            uptime: process.uptime()
+        // Test database connection
+        db.get('SELECT COUNT(*) as count FROM players', (err, row) => {
+            if (err) {
+                return res.json({
+                    status: 'unhealthy',
+                    timestamp: new Date().toISOString(),
+                    database: 'error',
+                    error: err.message
+                });
+            }
+            
+            res.json({
+                status: 'healthy',
+                timestamp: new Date().toISOString(),
+                database: 'connected',
+                player_count: row.count,
+                uptime: process.uptime()
+            });
         });
     } catch (error) {
         res.status(500).json({ 
@@ -472,38 +615,35 @@ app.get('/api/health/detailed', async (req, res) => {
 });
 
 // Background task to complete expired recharges
-async function completeExpiredRecharges() {
-    try {
-        const now = new Date().toISOString();
-        const query = `
-            UPDATE recharge_tracking 
-            SET lives_remaining = 3, 
-                is_recharging = false, 
-                recharge_cooldown_end = NULL,
-                last_recharge_time = CURRENT_TIMESTAMP,
-                updated_at = CURRENT_TIMESTAMP
-            WHERE is_recharging = true 
-            AND recharge_cooldown_end IS NOT NULL 
-            AND recharge_cooldown_end <= $1
-        `;
-        
-        const client = await database.pgPool.connect();
-        const result = await client.query(query, [now]);
-        client.release();
-        
-        if (result.rowCount > 0) {
-            console.log(`✅ Completed ${result.rowCount} expired recharges`);
+function completeExpiredRecharges() {
+    if (!dbInitialized) return;
+    
+    const now = new Date().toISOString();
+    const query = `
+        UPDATE recharge_tracking 
+        SET lives_remaining = 3, 
+            is_recharging = 0, 
+            recharge_cooldown_end = NULL,
+            last_recharge_time = CURRENT_TIMESTAMP,
+            updated_at = CURRENT_TIMESTAMP
+        WHERE is_recharging = 1 
+        AND recharge_cooldown_end IS NOT NULL 
+        AND recharge_cooldown_end <= ?
+    `;
+    
+    db.run(query, [now], function(err) {
+        if (err) {
+            console.error('❌ Error completing expired recharges:', err);
+        } else if (this.changes > 0) {
+            console.log(`✅ Completed ${this.changes} expired recharges`);
         }
-    } catch (error) {
-        console.error('❌ Error completing expired recharges:', error);
-    }
+    });
 }
 
 // Start server with enhanced logging
 const server = app.listen(PORT, () => {
     console.log(`🚀 Enhanced Kaboom Server running on port ${PORT}`);
-    console.log(`📊 Admin Dashboard: http://localhost:${PORT}/admin-dashboard.html`);
-    console.log(`🔍 Simple Admin Panel: http://localhost:${PORT}/admin-panel.html`);
+    console.log(`📊 Admin Dashboard: http://localhost:${PORT}/admin`);
     console.log(`🎯 Game: http://localhost:${PORT}/`);
     console.log(`⚡ Health Check: http://localhost:${PORT}/api/health`);
     console.log(`🧪 Test Endpoint: http://localhost:${PORT}/test`);
@@ -529,13 +669,14 @@ process.on('SIGINT', async () => {
     console.log('\n🛑 Shutting down enhanced server...');
     
     try {
-        if (database.pgPool) {
-            await database.pgPool.end();
-            console.log('✅ PostgreSQL pool closed');
-        }
-        if (database.redisClient) {
-            await database.redisClient.quit();
-            console.log('✅ Redis client closed');
+        if (db) {
+            db.close((err) => {
+                if (err) {
+                    console.error('❌ Error closing database:', err.message);
+                } else {
+                    console.log('✅ Database closed');
+                }
+            });
         }
     } catch (error) {
         console.error('❌ Error closing database connections:', error.message);
