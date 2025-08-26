@@ -684,13 +684,16 @@ class PirateBombGame {
 							currentScore: this.gameState.currentScore
 						};
 						
-						window.playerDataManager.savePlayerProfile(playerProfile).then(result => {
-							if (result.success) {
-								console.log('✅ Initial player data saved to database');
-							} else {
-								console.warn('⚠️ Failed to save initial data to database:', result.error);
-							}
-						});
+						// Use GameSessionManager for data saving instead of PlayerDataManager
+						if (window.gameSessionManager) {
+							window.gameSessionManager.forceSave().then(result => {
+								if (result.success) {
+									console.log('✅ Initial player data saved via GameSessionManager');
+								} else {
+									console.warn('⚠️ Failed to save initial data via GameSessionManager:', result.error);
+								}
+							});
+						}
 					} else {
 						console.log('⏳ Wallet not connected yet, will save initial data when connected');
 					}
@@ -723,13 +726,16 @@ class PirateBombGame {
 							currentScore: this.gameState.currentScore
 						};
 						
-						window.playerDataManager.savePlayerProfile(playerProfile).then(result => {
-							if (result.success) {
-								console.log('✅ Player data synced to database after loading progress');
-							} else {
-								console.warn('⚠️ Failed to sync to database:', result.error);
-							}
-						});
+						// Use GameSessionManager for data saving instead of PlayerDataManager
+						if (window.gameSessionManager) {
+							window.gameSessionManager.forceSave().then(result => {
+								if (result.success) {
+									console.log('✅ Player data synced via GameSessionManager after loading progress');
+								} else {
+									console.warn('⚠️ Failed to sync via GameSessionManager:', result.error);
+								}
+							});
+						}
 					} else {
 						console.log('⏳ Wallet not connected yet, will sync when connected');
 					}
@@ -1748,17 +1754,18 @@ class PirateBombGame {
 							currentScore: this.gameState.currentScore
 						};
 						
-						console.log('📊 Saving player profile:', playerProfile);
-						window.playerDataManager.savePlayerProfile(playerProfile).then(result => {
-							console.log('📊 Save result:', result);
-							if (result.success) {
-								console.log('✅ Player data saved to database after enemy kill');
-							} else {
-								console.warn('⚠️ Failed to save to database:', result.error);
-							}
-						}).catch(error => {
-							console.error('❌ Error saving to database:', error);
-						});
+						// Use GameSessionManager for data saving instead of PlayerDataManager
+						if (window.gameSessionManager) {
+							window.gameSessionManager.onEnemyKilled().then(result => {
+								if (result.success) {
+									console.log('✅ Enemy kill data saved via GameSessionManager');
+								} else {
+									console.warn('⚠️ Failed to save enemy kill data via GameSessionManager:', result.error);
+								}
+							}).catch(error => {
+								console.error('❌ Error saving enemy kill data via GameSessionManager:', error);
+							});
+						}
 					} else {
 						console.log('⏳ Wallet not connected yet, will save when connected');
 					}
@@ -2328,13 +2335,16 @@ class PirateBombGame {
 							currentScore: this.gameState.currentScore
 						};
 						
-						window.playerDataManager.savePlayerProfile(playerProfile).then(result => {
-							if (result.success) {
-								console.log('✅ Player data saved to database on game over');
-							} else {
-								console.warn('⚠️ Failed to save to database:', result.error);
-							}
-						});
+						// Use GameSessionManager for data saving instead of PlayerDataManager
+						if (window.gameSessionManager) {
+							window.gameSessionManager.onPlayerDeath().then(result => {
+								if (result.success) {
+									console.log('✅ Game over data saved via GameSessionManager');
+								} else {
+									console.warn('⚠️ Failed to save game over data via GameSessionManager:', result.error);
+								}
+							});
+						}
 					} else {
 						console.log('⏳ Wallet not connected, saving to localStorage only');
 					}
@@ -5929,13 +5939,16 @@ window.startGame = async function() {
 							currentScore: this.gameState.currentScore
 						};
 						
-						window.playerDataManager.savePlayerProfile(playerProfile).then(result => {
-							if (result.success) {
-								console.log('✅ Game state synced to database');
-							} else {
-								console.warn('⚠️ Failed to sync game state to database:', result.error);
-							}
-						});
+						// Use GameSessionManager for data saving instead of PlayerDataManager
+						if (window.gameSessionManager) {
+							window.gameSessionManager.forceSave().then(result => {
+								if (result.success) {
+									console.log('✅ Game state synced via GameSessionManager');
+								} else {
+									console.warn('⚠️ Failed to sync game state via GameSessionManager:', result.error);
+								}
+							});
+						}
 					}
 				}
 			},
