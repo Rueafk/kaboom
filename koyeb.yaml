@@ -8,7 +8,7 @@ env:
   - name: POSTGRES_USER
     value: postgres
   - name: POSTGRES_HOST
-    value: postgres
+    value: postgres-kaboom-game
   - name: POSTGRES_DB
     value: kaboom_game
   - name: POSTGRES_PASSWORD
@@ -16,7 +16,7 @@ env:
   - name: POSTGRES_PORT
     value: "5432"
   - name: REDIS_URL
-    value: redis://redis:6379
+    value: redis://redis-kaboom-game:6379
 build:
   builder: nodejs
   buildCommand: npm install
