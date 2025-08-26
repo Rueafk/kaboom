@@ -28,12 +28,13 @@ app.use(cors({
     credentials: true
 }));
 app.use(bodyParser.json({ limit: '10mb' }));
-app.use(express.static('.'));
 
-// Admin dashboard route
+// Admin dashboard route - must come BEFORE static file serving
 app.get('/admin', (req, res) => {
     res.sendFile(path.join(__dirname, 'admin-dashboard.html'));
 });
+
+app.use(express.static('.'));
 
 // Database setup with enhanced error handling
 const db = new sqlite3.Database('./player_data.db', (err) => {
