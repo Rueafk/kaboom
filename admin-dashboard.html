@@ -316,7 +316,7 @@
                 document.querySelector('.header p').textContent = 
                     `Worldwide Real-time Game Monitoring - Last updated: ${new Date().toLocaleTimeString()}`;
                     
-            } catch (error) {
+                            } catch (error) {
                 console.error('❌ Error refreshing data:', error);
                 showError('Failed to refresh data: ' + error.message);
             }

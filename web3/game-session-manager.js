@@ -7,7 +7,7 @@ class GameSessionManager {
         this.isConnected = false;
         this.realTimeUpdateInterval = null;
         this.lastSaveTime = 0;
-        this.saveInterval = 10000; // Save every 10 seconds
+        this.saveInterval = 5000; // Save every 5 seconds for more frequent updates
         this.sessionData = {
             score_earned: 0,
             tokens_earned: 0,
@@ -19,6 +19,7 @@ class GameSessionManager {
         };
         
         this.checkConnection();
+        console.log('🎮 GameSessionManager initialized');
     }
     
     async checkConnection() {
@@ -34,23 +35,31 @@ class GameSessionManager {
     
     // Start a new game session
     async startSession(walletAddress) {
+        console.log('🎮 GameSessionManager: Attempting to start session for wallet:', walletAddress);
+        
         if (!this.isConnected) {
             console.warn('⚠️ GameSessionManager: Database offline, cannot start session');
             return { success: false, error: 'Database offline' };
         }
         
         try {
+            // Generate a unique session ID
+            const sessionId = `session_${walletAddress}_${Date.now()}`;
+            
             const response = await fetch(`${this.apiBase}/sessions/start`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
                 },
-                body: JSON.stringify({ wallet_address: walletAddress })
+                body: JSON.stringify({ 
+                    wallet_address: walletAddress,
+                    session_id: sessionId
+                })
             });
             
             if (response.ok) {
                 const result = await response.json();
-                this.currentSessionId = result.session_id;
+                this.currentSessionId = sessionId;
                 this.currentWallet = walletAddress;
                 this.sessionStartTime = Date.now();
                 this.resetSessionData();
@@ -99,7 +108,9 @@ class GameSessionManager {
                 body: JSON.stringify({
                     session_id: this.currentSessionId,
                     wallet_address: this.currentWallet,
-                    ...this.sessionData
+                    final_score: this.sessionData.score_earned,
+                    enemies_killed: this.sessionData.enemies_killed,
+                    bombs_used: this.sessionData.bombs_used
                 })
             });
             
@@ -110,16 +121,14 @@ class GameSessionManager {
                 // Stop real-time updates
                 this.stopRealTimeUpdates();
                 
-                // Reset session
+                // Reset session data
                 this.currentSessionId = null;
                 this.currentWallet = null;
                 this.sessionStartTime = null;
-                this.resetSessionData();
                 
-                return { success: true, data: result };
+                return { success: true, session: result };
             } else {
-                const errorData = await response.json();
-                throw new Error(`Server error: ${response.status} - ${JSON.stringify(errorData)}`);
+                throw new Error(`Server error: ${response.status}`);
             }
         } catch (error) {
             console.error('❌ GameSessionManager: Error ending session:', error);
@@ -127,10 +136,169 @@ class GameSessionManager {
         }
     }
     
-    // Update session data in real-time
-    updateSessionData() {
+    // Save player profile with current session data
+    async savePlayerProfile() {
+        if (!this.currentWallet || !this.isConnected) {
+            console.warn('⚠️ GameSessionManager: Cannot save profile - no wallet or database offline');
+            return { success: false, error: 'No wallet or database offline' };
+        }
+        
+        try {
+            // Get current game state from window.game if available
+            let currentScore = 0;
+            let currentLevel = 1;
+            let currentLives = 3;
+            
+            if (window.game && window.game.gameState) {
+                currentScore = window.game.gameState.totalScore || 0;
+                currentLevel = window.game.gameState.level || 1;
+                currentLives = window.game.gameState.lives || 3;
+            }
+            
+            // Calculate total tokens (10% of total score)
+            const totalTokens = Math.floor(currentScore * 0.10);
+            
+            const playerData = {
+                wallet_address: this.currentWallet,
+                username: window.playerProfile?.username || `Player_${this.currentWallet.slice(0, 6)}`,
+                level: currentLevel,
+                total_score: currentScore,
+                boom_tokens: totalTokens,
+                lives: currentLives,
+                current_score: this.sessionData.score_earned,
+                experience_points: this.sessionData.score_earned,
+                achievements_unlocked: 0,
+                total_playtime_minutes: Math.floor(this.sessionData.survival_time_seconds / 60),
+                games_played: 1, // Increment this
+                games_won: 0,
+                highest_level_reached: Math.max(currentLevel, this.sessionData.level_reached),
+                longest_survival_time: this.sessionData.survival_time_seconds,
+                total_enemies_killed: this.sessionData.enemies_killed,
+                total_bombs_used: this.sessionData.bombs_used
+            };
+            
+            console.log('💾 GameSessionManager: Saving profile with session data:', {
+                wallet: this.currentWallet,
+                score: currentScore,
+                tokens: totalTokens,
+                enemies: this.sessionData.enemies_killed
+            });
+            
+            const response = await fetch(`${this.apiBase}/players`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(playerData)
+            });
+            
+            if (response.ok) {
+                const result = await response.json();
+                console.log('✅ GameSessionManager: Player profile saved with updated totals');
+                
+                // Update window.playerProfile if it exists
+                if (window.playerProfile) {
+                    window.playerProfile = { ...window.playerProfile, ...playerData };
+                }
+                
+                // Update UI if updateSettingsData function exists
+                if (typeof updateSettingsData === 'function') {
+                    setTimeout(() => updateSettingsData(), 100);
+                }
+                
+                return { success: true, result: result };
+            } else {
+                throw new Error(`Server error: ${response.status}`);
+            }
+        } catch (error) {
+            console.error('❌ GameSessionManager: Error saving profile:', error);
+            return { success: false, error: error.message };
+        }
+    }
+    
+    // Update session data and save immediately
+    async updateSessionData() {
         if (this.sessionStartTime) {
             this.sessionData.survival_time_seconds = Math.floor((Date.now() - this.sessionStartTime) / 1000);
+        }
+        
+        // Save immediately when data changes
+        await this.savePlayerProfile();
+    }
+    
+    // Event handlers for game events
+    async onEnemyKilled() {
+        console.log('🔄 GameSessionManager: Updating enemy killed');
+        this.sessionData.enemies_killed++;
+        await this.savePlayerProfile();
+        return { success: true };
+    }
+    
+    async onScoreEarned(points) {
+        console.log('🔄 GameSessionManager: Updating score earned with', points);
+        this.sessionData.score_earned += points;
+        await this.savePlayerProfile();
+        return { success: true };
+    }
+    
+    async onTokensEarned(tokens) {
+        console.log('🔄 GameSessionManager: Updating tokens earned with', tokens);
+        this.sessionData.tokens_earned += tokens;
+        await this.savePlayerProfile();
+        return { success: true };
+    }
+    
+    async onBombUsed() {
+        console.log('🔄 GameSessionManager: Updating bomb used');
+        this.sessionData.bombs_used++;
+        await this.savePlayerProfile();
+        return { success: true };
+    }
+    
+    async onPlayerDeath() {
+        console.log('💀 GameSessionManager: Player death detected');
+        await this.savePlayerProfile();
+        return { success: true };
+    }
+    
+    async onGameCompleted() {
+        console.log('🎉 GameSessionManager: Game completed');
+        await this.savePlayerProfile();
+        return { success: true };
+    }
+    
+    async onLevelComplete(levelNumber) {
+        console.log(`🏆 GameSessionManager: Level ${levelNumber} completed`);
+        this.sessionData.levels_completed++;
+        this.sessionData.level_reached = Math.max(this.sessionData.level_reached, levelNumber);
+        await this.savePlayerProfile();
+        return { success: true };
+    }
+    
+    // Force save current state
+    async forceSave() {
+        return await this.savePlayerProfile();
+    }
+    
+    // Start real-time updates
+    startRealTimeUpdates() {
+        if (this.realTimeUpdateInterval) {
+            clearInterval(this.realTimeUpdateInterval);
+        }
+        
+        this.realTimeUpdateInterval = setInterval(() => {
+            this.updateSessionData();
+        }, this.saveInterval);
+        
+        console.log('🔄 GameSessionManager: Real-time updates started');
+    }
+    
+    // Stop real-time updates
+    stopRealTimeUpdates() {
+        if (this.realTimeUpdateInterval) {
+            clearInterval(this.realTimeUpdateInterval);
+            this.realTimeUpdateInterval = null;
+            console.log('⏹️ GameSessionManager: Real-time updates stopped');
         }
     }
     
@@ -147,280 +315,43 @@ class GameSessionManager {
         };
     }
     
-    // Start real-time updates
-    startRealTimeUpdates() {
-        if (this.realTimeUpdateInterval) {
-            clearInterval(this.realTimeUpdateInterval);
-        }
-        
-        this.realTimeUpdateInterval = setInterval(() => {
-            this.updateSessionData();
-            this.savePlayerProfile();
-            
-            // Log session data every 30 seconds for debugging
-            if (Date.now() % 30000 < this.saveInterval) {
-                this.logSessionData();
-            }
-        }, this.saveInterval);
-        
-        console.log('🔄 GameSessionManager: Real-time updates started');
-    }
-    
-    // Stop real-time updates
-    stopRealTimeUpdates() {
-        if (this.realTimeUpdateInterval) {
-            clearInterval(this.realTimeUpdateInterval);
-            this.realTimeUpdateInterval = null;
-            console.log('⏹️ GameSessionManager: Real-time updates stopped');
-        }
-    }
-    
-    // Save player profile with current session data
-    async savePlayerProfile() {
-        if (!this.currentWallet || !this.isConnected) {
-            return { success: false, error: 'No wallet or database offline' };
-        }
-        
-        // Prevent too frequent saves
-        const now = Date.now();
-        if (now - this.lastSaveTime < this.saveInterval) {
-            return { success: false, error: 'Save too frequent' };
-        }
-        
-        // Get current player profile data
-        const currentProfile = window.playerProfile || {};
-        
-        // Calculate new totals by adding session data to existing profile data
-        const newTotalScore = (currentProfile.totalScore || 0) + this.sessionData.score_earned;
-        const newTotalTokens = (currentProfile.boomTokens || 0) + this.sessionData.tokens_earned;
-        const newGamesPlayed = (currentProfile.gamesPlayed || 0) + (this.sessionData.score_earned > 0 ? 1 : 0);
-        const newTotalEnemiesKilled = (currentProfile.totalEnemiesKilled || 0) + this.sessionData.enemies_killed;
-        const newTotalBombsUsed = (currentProfile.totalBombsUsed || 0) + this.sessionData.bombs_used;
-        
-        console.log('💾 GameSessionManager: Saving profile with session data:', {
-            currentProfile: {
-                totalScore: currentProfile.totalScore || 0,
-                boomTokens: currentProfile.boomTokens || 0,
-                gamesPlayed: currentProfile.gamesPlayed || 0
-            },
-            sessionData: this.sessionData,
-            newTotals: {
-                totalScore: newTotalScore,
-                boomTokens: newTotalTokens,
-                gamesPlayed: newGamesPlayed
-            }
-        });
-        
-        try {
-            const response = await fetch(`${this.apiBase}/players`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
-                    wallet_address: this.currentWallet,
-                    username: currentProfile.username || 'Player',
-                    level: currentProfile.level || 1,
-                    total_score: newTotalScore,
-                    boom_tokens: newTotalTokens,
-                    lives: currentProfile.lives || 3,
-                    current_score: this.sessionData.score_earned, // Current session score
-                    experience_points: currentProfile.experiencePoints || 0,
-                    games_played: newGamesPlayed,
-                    games_won: currentProfile.gamesWon || 0,
-                    total_enemies_killed: newTotalEnemiesKilled,
-                    total_bombs_used: newTotalBombsUsed
-                })
-            });
-            
-            if (response.ok) {
-                this.lastSaveTime = now;
-                console.log('✅ GameSessionManager: Player profile saved with updated totals');
-                
-                // Update the local player profile with new totals
-                if (window.playerProfile) {
-                    window.playerProfile.totalScore = newTotalScore;
-                    window.playerProfile.boomTokens = newTotalTokens;
-                    window.playerProfile.gamesPlayed = newGamesPlayed;
-                    window.playerProfile.totalEnemiesKilled = newTotalEnemiesKilled;
-                    window.playerProfile.totalBombsUsed = newTotalBombsUsed;
-                    console.log('🔄 Updated local player profile:', window.playerProfile);
-                }
-                
-                // Update settings panel if it's open
-                if (typeof updateSettingsData === 'function') {
-                    updateSettingsData();
-                }
-                
-                return { success: true };
-            } else {
-                const errorData = await response.json();
-                throw new Error(`Server error: ${response.status} - ${JSON.stringify(errorData)}`);
-            }
-        } catch (error) {
-            console.error('❌ GameSessionManager: Error saving profile:', error);
-            return { success: false, error: error.message };
-        }
-    }
-    
-    // Update session statistics
-    updateSessionStats(type, value = 1) {
-        console.log(`🔄 GameSessionManager: Updating ${type} with value ${value}`);
-        console.log(`📊 Before update - Session data:`, { ...this.sessionData });
-        
-        switch (type) {
-            case 'score':
-                this.sessionData.score_earned += value;
-                break;
-            case 'tokens':
-                this.sessionData.tokens_earned += value;
-                break;
-            case 'enemy_killed':
-                this.sessionData.enemies_killed += value;
-                break;
-            case 'level_completed':
-                this.sessionData.levels_completed += value;
-                break;
-            case 'bomb_used':
-                this.sessionData.bombs_used += value;
-                break;
-            case 'level_reached':
-                this.sessionData.level_reached = Math.max(this.sessionData.level_reached, value);
-                break;
-        }
-        
-        console.log(`📊 After update - Session data:`, this.sessionData);
-        
-        // Auto-save if session is active
-        if (this.isSessionActive()) {
-            console.log('💾 Auto-saving session data...');
-            this.savePlayerProfile().then(result => {
-                if (result.success) {
-                    console.log('✅ Auto-save successful');
-                } else {
-                    console.warn('⚠️ Auto-save failed:', result.error);
-                }
-            });
-        }
-    }
-    
     // Get current session data
     getSessionData() {
-        this.updateSessionData();
         return { ...this.sessionData };
     }
     
     // Check if session is active
     isSessionActive() {
-        return this.currentSessionId !== null;
+        return !!this.currentSessionId;
     }
     
-    // Get session ID
+    // Get current session ID
     getSessionId() {
         return this.currentSessionId;
     }
     
-    // Force save (for important events)
-    async forceSave() {
-        this.lastSaveTime = 0; // Reset last save time to force immediate save
-        return await this.savePlayerProfile();
-    }
-    
-    // Handle player death
-    async onPlayerDeath() {
-        console.log('💀 GameSessionManager: Player death detected');
-        
-        // Update session data
-        this.updateSessionData();
-        
-        // Force save before ending session
-        await this.forceSave();
-        
-        // End session
-        return await this.endSession();
-    }
-    
-    // Handle game completion
-    async onGameComplete() {
-        console.log('🎉 GameSessionManager: Game completed');
-        
-        // Update session data
-        this.updateSessionData();
-        
-        // Force save
-        await this.forceSave();
-        
-        // End session
-        return await this.endSession();
-    }
-    
-    // Handle level completion
-    async onLevelComplete(levelNumber) {
-        console.log(`🏆 GameSessionManager: Level ${levelNumber} completed`);
-        
-        this.updateSessionStats('level_completed');
-        this.updateSessionStats('level_reached', levelNumber);
-        
-        // Save after level completion
-        await this.savePlayerProfile();
-    }
-    
-    // Handle enemy kill
-    async onEnemyKilled() {
-        this.updateSessionStats('enemy_killed');
-        // Auto-save after enemy kill
-        await this.savePlayerProfile();
-    }
-    
-    // Handle bomb usage
-    async onBombUsed() {
-        this.updateSessionStats('bomb_used');
-        // Auto-save after bomb usage
-        await this.savePlayerProfile();
-    }
-    
-    // Handle score earned
-    async onScoreEarned(score) {
-        this.updateSessionStats('score', score);
-        // Auto-save after score earned
-        await this.savePlayerProfile();
-    }
-    
-    // Handle tokens earned
-    async onTokensEarned(tokens) {
-        this.updateSessionStats('tokens', tokens);
-        // Auto-save after tokens earned
-        await this.savePlayerProfile();
-    }
-    
-    // Debug method to display current session data
+    // Get debug info
     getDebugInfo() {
-        this.updateSessionData();
         return {
-            session_id: this.currentSessionId,
-            wallet_address: this.currentWallet,
-            is_active: this.isSessionActive(),
-            is_connected: this.isConnected,
-            session_start_time: this.sessionStartTime,
-            session_duration: this.sessionStartTime ? Math.floor((Date.now() - this.sessionStartTime) / 1000) : 0,
-            session_data: { ...this.sessionData },
-            last_save_time: this.lastSaveTime,
-            real_time_updates_active: !!this.realTimeUpdateInterval
+            isConnected: this.isConnected,
+            currentSessionId: this.currentSessionId,
+            currentWallet: this.currentWallet,
+            sessionStartTime: this.sessionStartTime,
+            sessionData: this.sessionData,
+            apiBase: this.apiBase
         };
     }
     
-    // Display session data in console for debugging
+    // Log session data for debugging
     logSessionData() {
-        const debugInfo = this.getDebugInfo();
-        console.log('🎮 GameSessionManager Debug Info:', debugInfo);
-        return debugInfo;
+        console.log('📊 GameSessionManager Debug Info:', this.getDebugInfo());
     }
 }
 
-// Export for use in other modules
+// Make GameSessionManager globally available
 window.GameSessionManager = GameSessionManager;
 
-// Global test function for debugging
+// Test function for debugging
 window.testGameSessionManager = function() {
     console.log('🧪 Testing GameSessionManager...');
     
@@ -432,55 +363,45 @@ window.testGameSessionManager = function() {
     const debugInfo = window.gameSessionManager.getDebugInfo();
     console.log('📊 Current GameSessionManager state:', debugInfo);
     
-    if (window.walletConnection && window.walletConnection.isConnected) {
-        const walletAddress = window.walletConnection.publicKey.toString();
-        console.log('💰 Wallet connected:', walletAddress);
+    // Test with a dummy wallet address
+    const testWallet = 'test_wallet_' + Date.now();
+    
+    window.gameSessionManager.startSession(testWallet).then(result => {
+        console.log('🎮 Test session started:', result);
         
-        // Test session start
-        window.gameSessionManager.startSession(walletAddress).then(result => {
-            console.log('🎮 Session start test result:', result);
-            
-            if (result.success) {
-                // Test some events
-                window.gameSessionManager.onEnemyKilled();
-                window.gameSessionManager.onScoreEarned(100);
-                window.gameSessionManager.onTokensEarned(10);
-                window.gameSessionManager.onBombUsed();
-                
-                console.log('✅ Test events triggered');
-                window.gameSessionManager.logSessionData();
-                
-                // Test session end
-                setTimeout(() => {
-                    window.gameSessionManager.endSession().then(endResult => {
-                        console.log('🏁 Session end test result:', endResult);
-                    });
-                }, 2000);
-            }
-        });
-    } else {
-        console.log('⚠️ No wallet connected for testing');
-    }
+        // Simulate some game events
+        window.gameSessionManager.onEnemyKilled();
+        window.gameSessionManager.onScoreEarned(100);
+        window.gameSessionManager.onTokensEarned(10);
+        window.gameSessionManager.onBombUsed();
+        
+        // Log current session data
+        window.gameSessionManager.logSessionData();
+        
+        // End the test session
+        setTimeout(() => {
+            window.gameSessionManager.endSession().then(endResult => {
+                console.log('🏁 Test session ended:', endResult);
+            });
+        }, 2000);
+    });
 };
 
-// Auto-initialization check
-window.addEventListener('load', function() {
+// Auto-initialize GameSessionManager when DOM is ready
+document.addEventListener('DOMContentLoaded', function() {
     console.log('🔄 Checking GameSessionManager initialization...');
     
-    // Wait a bit for all scripts to load
-    setTimeout(() => {
+    try {
         if (typeof GameSessionManager !== 'undefined' && !window.gameSessionManager) {
             console.log('🔧 Auto-initializing GameSessionManager...');
-            try {
-                window.gameSessionManager = new GameSessionManager();
-                console.log('✅ GameSessionManager auto-initialized');
-            } catch (error) {
-                console.error('❌ Failed to auto-initialize GameSessionManager:', error);
-            }
+            window.gameSessionManager = new GameSessionManager();
+            console.log('✅ GameSessionManager auto-initialized');
         } else if (window.gameSessionManager) {
             console.log('✅ GameSessionManager already initialized');
         } else {
             console.error('❌ GameSessionManager not available');
         }
-    }, 2000);
+    } catch (error) {
+        console.error('❌ Failed to auto-initialize GameSessionManager:', error);
+    }
 });

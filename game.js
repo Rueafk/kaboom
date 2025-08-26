@@ -2290,7 +2290,18 @@ class PirateBombGame {
 			console.log('🏁 Ending game session via GameSessionManager...');
 			window.gameSessionManager.onPlayerDeath().then(result => {
 				if (result.success) {
-					console.log('✅ Game session ended successfully:', result.data);
+					console.log('✅ Game session ended successfully');
+				} else {
+					console.warn('⚠️ Failed to end game session:', result.error);
+				}
+			}).catch(error => {
+				console.error('❌ Error ending game session:', error);
+			});
+			
+			// Also end the session
+			window.gameSessionManager.endSession().then(result => {
+				if (result.success) {
+					console.log('✅ Game session properly ended');
 				} else {
 					console.warn('⚠️ Failed to end game session:', result.error);
 				}
@@ -2342,6 +2353,15 @@ class PirateBombGame {
 									console.log('✅ Game over data saved via GameSessionManager');
 								} else {
 									console.warn('⚠️ Failed to save game over data via GameSessionManager:', result.error);
+								}
+							});
+							
+							// Also end the session
+							window.gameSessionManager.endSession().then(result => {
+								if (result.success) {
+									console.log('✅ Game session ended on game over');
+								} else {
+									console.warn('⚠️ Failed to end game session on game over:', result.error);
 								}
 							});
 						}
@@ -3669,10 +3689,18 @@ class Player {
 			// Debug: Log bomb placement
 			console.log(`Bomb placed at (${bombX}, ${bombY}) - Fuse: ${newBomb.fuseTimer}ms`);
 			
-			// Update GameSessionManager with bomb usage
-			if (window.gameSessionManager && window.gameSessionManager.isSessionActive()) {
-				window.gameSessionManager.onBombUsed();
-			}
+							// Update GameSessionManager with bomb usage
+				if (window.gameSessionManager && window.gameSessionManager.isSessionActive()) {
+					window.gameSessionManager.onBombUsed().then(result => {
+						if (result.success) {
+							console.log('✅ Bomb usage data saved via GameSessionManager');
+						} else {
+							console.warn('⚠️ Failed to save bomb usage data via GameSessionManager:', result.error);
+						}
+					}).catch(error => {
+						console.error('❌ Error saving bomb usage data via GameSessionManager:', error);
+					});
+				}
 			
 			if (game.soundManager) game.soundManager.play('bomb');
 			return true; 
@@ -4798,14 +4826,49 @@ class Enemy {
 				
 				if (window.gameSessionManager && window.gameSessionManager.isSessionActive()) {
 					console.log('✅ Session active, updating GameSessionManager...');
-					window.gameSessionManager.onEnemyKilled();
-					window.gameSessionManager.onScoreEarned(enemyKillPoints);
+					
+					// Update game state first
+					game.gameState.totalScore += enemyKillPoints;
+					game.gameState.currentScore += enemyKillPoints;
+					
+					// Then update GameSessionManager
+					window.gameSessionManager.onEnemyKilled().then(result => {
+						if (result.success) {
+							console.log('✅ Enemy kill data saved via GameSessionManager');
+						} else {
+							console.warn('⚠️ Failed to save enemy kill data via GameSessionManager:', result.error);
+						}
+					}).catch(error => {
+						console.error('❌ Error saving enemy kill data via GameSessionManager:', error);
+					});
+					
+					window.gameSessionManager.onScoreEarned(enemyKillPoints).then(result => {
+						if (result.success) {
+							console.log('✅ Score data saved via GameSessionManager');
+						} else {
+							console.warn('⚠️ Failed to save score data via GameSessionManager:', result.error);
+						}
+					}).catch(error => {
+						console.error('❌ Error saving score data via GameSessionManager:', error);
+					});
 					
 					// Calculate and track tokens earned (10% of score)
 					const tokensEarned = Math.floor(enemyKillPoints * 0.10);
-					window.gameSessionManager.onTokensEarned(tokensEarned);
+					window.gameSessionManager.onTokensEarned(tokensEarned).then(result => {
+						if (result.success) {
+							console.log('✅ Tokens data saved via GameSessionManager');
+						} else {
+							console.warn('⚠️ Failed to save tokens data via GameSessionManager:', result.error);
+						}
+					}).catch(error => {
+						console.error('❌ Error saving tokens data via GameSessionManager:', error);
+					});
 				} else {
 					console.warn('⚠️ GameSessionManager not active, cannot update session data');
+					
+					// Fallback: Update game state directly
+					game.gameState.totalScore += enemyKillPoints;
+					game.gameState.currentScore += enemyKillPoints;
 				}
 				
 				// IMMEDIATELY save to localStorage when score changes
