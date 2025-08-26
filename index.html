@@ -2190,6 +2190,13 @@
                 });
             }
             
+            // Also update settings data when wallet connects
+            if (window.walletConnection) {
+                window.walletConnection.addEventListener('connected', async () => {
+                    await updateSettingsData();
+                });
+            }
+            
             // Close button click handler
             if (closeSettingsBtn) {
                 closeSettingsBtn.addEventListener('click', () => {
@@ -2287,11 +2294,23 @@
             if (window.walletConnection && window.walletConnection.publicKey && window.playerDataManager) {
                 try {
                     const walletAddress = window.walletConnection.publicKey.toString();
+                    console.log('🔄 Refreshing player profile for wallet:', walletAddress);
                     const freshProfile = await window.playerDataManager.loadPlayerProfile(walletAddress);
                     
                     if (freshProfile) {
                         console.log('📊 Refreshed player profile from database:', freshProfile);
                         window.playerProfile = freshProfile;
+                    } else {
+                        console.log('📝 No existing profile found, will create new one when game starts');
+                        // Create a default profile structure
+                        window.playerProfile = {
+                            walletAddress: walletAddress,
+                            username: `Player_${walletAddress.substring(0, 6)}`,
+                            level: 1,
+                            totalScore: 0,
+                            boomTokens: 0,
+                            gamesPlayed: 0
+                        };
                     }
                 } catch (error) {
                     console.warn('⚠️ Failed to refresh player profile from database:', error);

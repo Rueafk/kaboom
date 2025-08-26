@@ -247,6 +247,11 @@ class GameSessionManager {
                     console.log('🔄 Updated local player profile:', window.playerProfile);
                 }
                 
+                // Update settings panel if it's open
+                if (typeof updateSettingsData === 'function') {
+                    updateSettingsData();
+                }
+                
                 return { success: true };
             } else {
                 const errorData = await response.json();

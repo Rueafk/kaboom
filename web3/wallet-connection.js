@@ -1077,6 +1077,9 @@ By signing this message, you agree to connect your wallet to the Kaboom game.`;
                 if (playerProfile) {
                     console.log('📊 Updating player info from database:', playerProfile);
                     
+                    // Set the global player profile
+                    window.playerProfile = playerProfile;
+                    
                     if (playerLevel) {
                         playerLevel.textContent = playerProfile.level || 1;
                     }
@@ -1087,6 +1090,12 @@ By signing this message, you agree to connect your wallet to the Kaboom game.`;
                         playerTokenBalance.textContent = playerProfile.boomTokens || 0;
                         console.log(`💰 Database update - Token display: ${playerProfile.boomTokens} (from database)`);
                     }
+                    
+                    // Update settings panel if it's open
+                    if (typeof updateSettingsData === 'function') {
+                        updateSettingsData();
+                    }
+                    
                     return; // Use database data if available
                 }
             } catch (error) {
