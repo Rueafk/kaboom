@@ -1,6 +1,5 @@
 const { Pool } = require('pg');
 const redis = require('redis');
-const sqlite3 = require('sqlite3').verbose();
 
 // PostgreSQL Configuration with fallback
 let pgPool = null;
@@ -39,17 +38,7 @@ try {
     useRedis = false;
 }
 
-// SQLite fallback
-let sqliteDb = null;
-if (!usePostgres) {
-    sqliteDb = new sqlite3.Database('./player_data.db', (err) => {
-        if (err) {
-            console.error('❌ SQLite fallback failed:', err.message);
-        } else {
-            console.log('✅ SQLite fallback connected');
-        }
-    });
-}
+// No SQLite fallback - PostgreSQL only
 
 // Database initialization
 async function initializeDatabase() {
@@ -222,42 +211,8 @@ async function savePlayer(playerData) {
         } finally {
             client.release();
         }
-    } else if (sqliteDb) {
-        // Fallback to SQLite
-        return new Promise((resolve, reject) => {
-            const query = `
-                INSERT OR REPLACE INTO players 
-                (wallet_address, username, level, total_score, boom_tokens, lives, current_score, 
-                 experience_points, games_played, games_won, total_enemies_killed, total_bombs_used, 
-                 last_updated, last_login)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-            `;
-            
-            const values = [
-                playerData.wallet_address,
-                playerData.username,
-                playerData.level || 1,
-                playerData.total_score || 0,
-                playerData.boom_tokens || 0,
-                playerData.lives || 3,
-                playerData.current_score || 0,
-                playerData.experience_points || 0,
-                playerData.games_played || 0,
-                playerData.games_won || 0,
-                playerData.total_enemies_killed || 0,
-                playerData.total_bombs_used || 0
-            ];
-            
-            sqliteDb.run(query, values, function(err) {
-                if (err) {
-                    reject(err);
-                } else {
-                    resolve({ id: this.lastID, ...playerData });
-                }
-            });
-        });
     } else {
-        throw new Error('No database available');
+        throw new Error('PostgreSQL database not available');
     }
 }
 
