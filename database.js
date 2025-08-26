@@ -1,22 +1,55 @@
 const { Pool } = require('pg');
 const redis = require('redis');
+const sqlite3 = require('sqlite3').verbose();
 
-// PostgreSQL Configuration
-const pgPool = new Pool({
-    user: process.env.POSTGRES_USER || 'postgres',
-    host: process.env.POSTGRES_HOST || 'localhost',
-    database: process.env.POSTGRES_DB || 'kaboom_game',
-    password: process.env.POSTGRES_PASSWORD || 'password',
-    port: process.env.POSTGRES_PORT || 5432,
-    max: 20, // Maximum number of clients in the pool
-    idleTimeoutMillis: 30000,
-    connectionTimeoutMillis: 2000,
-});
+// PostgreSQL Configuration with fallback
+let pgPool = null;
+let usePostgres = false;
 
-// Redis Configuration
-const redisClient = redis.createClient({
-    url: process.env.REDIS_URL || 'redis://localhost:6379'
-});
+try {
+    pgPool = new Pool({
+        user: process.env.POSTGRES_USER || 'postgres',
+        host: process.env.POSTGRES_HOST || 'localhost',
+        database: process.env.POSTGRES_DB || 'kaboom_game',
+        password: process.env.POSTGRES_PASSWORD || 'password',
+        port: process.env.POSTGRES_PORT || 5432,
+        max: 20, // Maximum number of clients in the pool
+        idleTimeoutMillis: 30000,
+        connectionTimeoutMillis: 2000,
+    });
+    usePostgres = true;
+    console.log('✅ PostgreSQL pool created');
+} catch (error) {
+    console.warn('⚠️ PostgreSQL not available, falling back to SQLite:', error.message);
+    usePostgres = false;
+}
+
+// Redis Configuration with fallback
+let redisClient = null;
+let useRedis = false;
+
+try {
+    redisClient = redis.createClient({
+        url: process.env.REDIS_URL || 'redis://localhost:6379'
+    });
+    useRedis = true;
+    console.log('✅ Redis client created');
+} catch (error) {
+    console.warn('⚠️ Redis not available:', error.message);
+    useRedis = false;
+}
+
+// SQLite fallback
+let sqliteDb = null;
+if (!usePostgres) {
+    sqliteDb = new sqlite3.Database('./player_data.db', (err) => {
+        if (err) {
+            console.error('❌ SQLite fallback failed:', err.message);
+        } else {
+            console.log('✅ SQLite fallback connected');
+        }
+    });
+}
 
 // Database initialization
 async function initializeDatabase() {
@@ -136,54 +169,95 @@ async function createTables(client) {
 
 // Player operations
 async function savePlayer(playerData) {
-    const client = await pgPool.connect();
-    try {
-        const query = `
-            INSERT INTO players (
-                wallet_address, username, level, total_score, boom_tokens, 
-                lives, current_score, experience_points, games_played, 
-                games_won, total_enemies_killed, total_bombs_used
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
-            ON CONFLICT (wallet_address) 
-            DO UPDATE SET 
-                username = EXCLUDED.username,
-                level = EXCLUDED.level,
-                total_score = EXCLUDED.total_score,
-                boom_tokens = EXCLUDED.boom_tokens,
-                lives = EXCLUDED.lives,
-                current_score = EXCLUDED.current_score,
-                experience_points = EXCLUDED.experience_points,
-                games_played = EXCLUDED.games_played,
-                games_won = EXCLUDED.games_won,
-                total_enemies_killed = EXCLUDED.total_enemies_killed,
-                total_bombs_used = EXCLUDED.total_bombs_used,
-                last_updated = CURRENT_TIMESTAMP
-            RETURNING *
-        `;
-        
-        const values = [
-            playerData.wallet_address,
-            playerData.username,
-            playerData.level || 1,
-            playerData.total_score || 0,
-            playerData.boom_tokens || 0,
-            playerData.lives || 3,
-            playerData.current_score || 0,
-            playerData.experience_points || 0,
-            playerData.games_played || 0,
-            playerData.games_won || 0,
-            playerData.total_enemies_killed || 0,
-            playerData.total_bombs_used || 0
-        ];
-        
-        const result = await client.query(query, values);
-        
-        // Update Redis cache
-        await redisClient.setEx(`player:${playerData.wallet_address}`, 3600, JSON.stringify(result.rows[0]));
-        
-        return result.rows[0];
-    } finally {
-        client.release();
+    if (usePostgres && pgPool) {
+        // Use PostgreSQL
+        const client = await pgPool.connect();
+        try {
+            const query = `
+                INSERT INTO players (
+                    wallet_address, username, level, total_score, boom_tokens, 
+                    lives, current_score, experience_points, games_played, 
+                    games_won, total_enemies_killed, total_bombs_used
+                ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+                ON CONFLICT (wallet_address) 
+                DO UPDATE SET 
+                    username = EXCLUDED.username,
+                    level = EXCLUDED.level,
+                    total_score = EXCLUDED.total_score,
+                    boom_tokens = EXCLUDED.boom_tokens,
+                    lives = EXCLUDED.lives,
+                    current_score = EXCLUDED.current_score,
+                    experience_points = EXCLUDED.experience_points,
+                    games_played = EXCLUDED.games_played,
+                    games_won = EXCLUDED.games_won,
+                    total_enemies_killed = EXCLUDED.total_enemies_killed,
+                    total_bombs_used = EXCLUDED.total_bombs_used,
+                    last_updated = CURRENT_TIMESTAMP
+                RETURNING *
+            `;
+            
+            const values = [
+                playerData.wallet_address,
+                playerData.username,
+                playerData.level || 1,
+                playerData.total_score || 0,
+                playerData.boom_tokens || 0,
+                playerData.lives || 3,
+                playerData.current_score || 0,
+                playerData.experience_points || 0,
+                playerData.games_played || 0,
+                playerData.games_won || 0,
+                playerData.total_enemies_killed || 0,
+                playerData.total_bombs_used || 0
+            ];
+            
+            const result = await client.query(query, values);
+            
+            // Update Redis cache if available
+            if (useRedis && redisClient) {
+                await redisClient.setEx(`player:${playerData.wallet_address}`, 3600, JSON.stringify(result.rows[0]));
+            }
+            
+            return result.rows[0];
+        } finally {
+            client.release();
+        }
+    } else if (sqliteDb) {
+        // Fallback to SQLite
+        return new Promise((resolve, reject) => {
+            const query = `
+                INSERT OR REPLACE INTO players 
+                (wallet_address, username, level, total_score, boom_tokens, lives, current_score, 
+                 experience_points, games_played, games_won, total_enemies_killed, total_bombs_used, 
+                 last_updated, last_login)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+            `;
+            
+            const values = [
+                playerData.wallet_address,
+                playerData.username,
+                playerData.level || 1,
+                playerData.total_score || 0,
+                playerData.boom_tokens || 0,
+                playerData.lives || 3,
+                playerData.current_score || 0,
+                playerData.experience_points || 0,
+                playerData.games_played || 0,
+                playerData.games_won || 0,
+                playerData.total_enemies_killed || 0,
+                playerData.total_bombs_used || 0
+            ];
+            
+            sqliteDb.run(query, values, function(err) {
+                if (err) {
+                    reject(err);
+                } else {
+                    resolve({ id: this.lastID, ...playerData });
+                }
+            });
+        });
+    } else {
+        throw new Error('No database available');
     }
 }
 
