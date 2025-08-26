@@ -11,6 +11,8 @@ env:
     value: postgres
   - name: POSTGRES_DB
     value: kaboom_game
+  - name: POSTGRES_PASSWORD
+    value: kaboom_password_123
   - name: POSTGRES_PORT
     value: "5432"
   - name: REDIS_URL
@@ -18,7 +20,7 @@ env:
 build:
   builder: nodejs
   buildCommand: npm install
-  startCommand: ./start.sh
+  startCommand: npm start
 routes:
   - path: /
     protocol: http
@@ -30,3 +32,18 @@ healthcheck:
   timeout: 10s
   retries: 5
   initialDelay: 30s
+
+---
+name: postgres
+type: postgresql
+env:
+  - name: POSTGRES_DB
+    value: kaboom_game
+  - name: POSTGRES_USER
+    value: postgres
+  - name: POSTGRES_PASSWORD
+    value: kaboom_password_123
+
+---
+name: redis
+type: redis
