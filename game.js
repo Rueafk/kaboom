@@ -4790,13 +4790,22 @@ class Enemy {
 				console.log(`💀 Enemy killed: ${this.type} - +${enemyKillPoints} points! Current score: ${game.gameState.currentScore}, Total score: ${game.gameState.totalScore}`);
 				
 				// Update GameSessionManager with enemy kill
+				console.log('🔍 GameSessionManager status:', {
+					exists: !!window.gameSessionManager,
+					isActive: window.gameSessionManager?.isSessionActive(),
+					sessionId: window.gameSessionManager?.getSessionId()
+				});
+				
 				if (window.gameSessionManager && window.gameSessionManager.isSessionActive()) {
+					console.log('✅ Session active, updating GameSessionManager...');
 					window.gameSessionManager.onEnemyKilled();
 					window.gameSessionManager.onScoreEarned(enemyKillPoints);
 					
 					// Calculate and track tokens earned (10% of score)
 					const tokensEarned = Math.floor(enemyKillPoints * 0.10);
 					window.gameSessionManager.onTokensEarned(tokensEarned);
+				} else {
+					console.warn('⚠️ GameSessionManager not active, cannot update session data');
 				}
 				
 				// IMMEDIATELY save to localStorage when score changes
@@ -5863,9 +5872,13 @@ window.startGame = async function() {
 	}
 	
 	// Start game session with GameSessionManager
+	console.log('🔍 Checking GameSessionManager availability:', !!window.gameSessionManager);
+	console.log('🔍 Checking wallet connection:', !!window.walletConnection);
+	console.log('🔍 Wallet connected status:', window.walletConnection?.isConnected);
+	
 	if (window.gameSessionManager && window.walletConnection && window.walletConnection.isConnected) {
 		const walletAddress = window.walletConnection.publicKey.toString();
-		console.log('🎮 Starting game session via GameSessionManager...');
+		console.log('🎮 Starting game session via GameSessionManager for wallet:', walletAddress);
 		
 		const sessionResult = await window.gameSessionManager.startSession(walletAddress);
 		if (sessionResult.success) {
@@ -5873,6 +5886,12 @@ window.startGame = async function() {
 		} else {
 			console.warn('⚠️ Failed to start game session:', sessionResult.error);
 		}
+	} else {
+		console.warn('⚠️ Cannot start game session - missing components:', {
+			gameSessionManager: !!window.gameSessionManager,
+			walletConnection: !!window.walletConnection,
+			isConnected: window.walletConnection?.isConnected
+		});
 	}
 	
 	// Check if DOM is ready

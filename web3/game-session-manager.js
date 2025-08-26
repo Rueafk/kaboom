@@ -368,21 +368,29 @@ class GameSessionManager {
     // Handle enemy kill
     async onEnemyKilled() {
         this.updateSessionStats('enemy_killed');
+        // Auto-save after enemy kill
+        await this.savePlayerProfile();
     }
     
     // Handle bomb usage
     async onBombUsed() {
         this.updateSessionStats('bomb_used');
+        // Auto-save after bomb usage
+        await this.savePlayerProfile();
     }
     
     // Handle score earned
     async onScoreEarned(score) {
         this.updateSessionStats('score', score);
+        // Auto-save after score earned
+        await this.savePlayerProfile();
     }
     
     // Handle tokens earned
     async onTokensEarned(tokens) {
         this.updateSessionStats('tokens', tokens);
+        // Auto-save after tokens earned
+        await this.savePlayerProfile();
     }
     
     // Debug method to display current session data
