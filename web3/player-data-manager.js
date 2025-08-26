@@ -89,6 +89,11 @@ class PlayerDataManager {
                     boomTokens: profile.boom_tokens,
                     lives: profile.lives,
                     currentScore: profile.current_score,
+                    gamesPlayed: profile.games_played, // map for settings UI
+                    gamesWon: profile.games_won,
+                    totalEnemiesKilled: profile.total_enemies_killed,
+                    totalBombsUsed: profile.total_bombs_used,
+                    experiencePoints: profile.experience_points,
                     lastUpdated: profile.last_updated
                 };
             } else if (response.status === 404) {
