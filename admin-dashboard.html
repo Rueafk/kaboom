@@ -201,14 +201,14 @@
             <input type="checkbox" id="autoRefresh" checked>
             <label for="autoRefresh">Auto-refresh every 10 seconds</label>
             <button class="refresh-btn" onclick="refreshData()">🔄 Refresh Now</button>
-        </div>
-        
-        <div class="stats-grid">
-            <div class="stat-card">
+                </div>
+                
+                <div class="stats-grid">
+                    <div class="stat-card">
                 <h3>🌐 Server Status</h3>
                 <div class="stat-value" id="serverStatus">Loading...</div>
-            </div>
-            
+                </div>
+                
             <div class="stat-card">
                 <h3>👥 Total Players</h3>
                 <div class="stat-value" id="totalPlayers">Loading...</div>
@@ -222,9 +222,9 @@
             <div class="stat-card">
                 <h3>💰 Total Tokens</h3>
                 <div class="stat-value" id="totalTokens">Loading...</div>
-            </div>
-            
-            <div class="stat-card">
+                </div>
+                
+                    <div class="stat-card">
                 <h3>🎮 Games Played</h3>
                 <div class="stat-value" id="gamesPlayed">Loading...</div>
             </div>
@@ -232,9 +232,9 @@
             <div class="stat-card">
                 <h3>💀 Enemies Killed</h3>
                 <div class="stat-value" id="enemiesKilled">Loading...</div>
-            </div>
-        </div>
-        
+                </div>
+                    </div>
+                    
         <div class="players-section">
             <h2>👥 Player Database</h2>
             <div id="playersTable">
@@ -302,7 +302,7 @@
                 document.querySelector('.header p').textContent = 
                     `Worldwide Real-time Game Monitoring - Last updated: ${new Date().toLocaleTimeString()}`;
                     
-            } catch (error) {
+                            } catch (error) {
                 console.error('❌ Error refreshing data:', error);
                 showError('Failed to refresh data: ' + error.message);
             }
@@ -379,42 +379,42 @@
         function updatePlayersTable(players) {
             const tableContainer = document.getElementById('playersTable');
             
-            if (players.length === 0) {
+                if (players.length === 0) {
                 tableContainer.innerHTML = '<div class="loading">No players found in database</div>';
-                return;
-            }
-            
+                    return;
+                }
+                
             const table = `
                 <table class="player-table">
-                    <thead>
-                        <tr>
-                            <th>Wallet Address</th>
+                        <thead>
+                            <tr>
+                                <th>Wallet Address</th>
                             <th>Username</th>
-                            <th>Level</th>
+                                <th>Level</th>
                             <th>Total Score</th>
                             <th>Tokens</th>
                             <th>Games</th>
                             <th>Enemies Killed</th>
-                            <th>Last Updated</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        ${players.map(player => `
-                            <tr>
+                                <th>Last Updated</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${players.map(player => `
+                                <tr>
                                 <td>${player.wallet_address.substring(0, 8)}...${player.wallet_address.substring(player.wallet_address.length - 8)}</td>
                                 <td>${player.username || 'Anonymous'}</td>
-                                <td>${player.level || 1}</td>
+                                    <td>${player.level || 1}</td>
                                 <td>${(player.total_score || 0).toLocaleString()}</td>
                                 <td>${(player.boom_tokens || 0).toLocaleString()}</td>
                                 <td>${player.games_played || 0}</td>
                                 <td>${player.total_enemies_killed || 0}</td>
                                 <td>${formatDate(player.last_updated)}</td>
-                            </tr>
-                        `).join('')}
-                    </tbody>
-                </table>
-            `;
-            
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                `;
+                
             tableContainer.innerHTML = table;
         }
         

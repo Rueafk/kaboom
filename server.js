@@ -1,9 +1,9 @@
 const express = require('express');
-const sqlite3 = require('sqlite3').verbose();
 const path = require('path');
 const cors = require('cors');
 const bodyParser = require('body-parser');
 const crypto = require('crypto');
+const { initializeDatabase, savePlayer, getPlayer, getAllPlayers, createSession, endSession, updateLeaderboard, healthCheck } = require('./database');
 
 const app = express();
 const PORT = process.env.PORT || 8080;
@@ -36,16 +36,28 @@ app.get('/admin', (req, res) => {
 
 app.use(express.static('.'));
 
-// Database setup with enhanced error handling
-const db = new sqlite3.Database('./player_data.db', (err) => {
-    if (err) {
-        console.error('❌ Database connection error:', err.message);
+// Initialize PostgreSQL and Redis
+let dbInitialized = false;
+
+async function initializeServer() {
+    try {
+        console.log('🚀 Initializing PostgreSQL and Redis...');
+        dbInitialized = await initializeDatabase();
+        
+        if (dbInitialized) {
+            console.log('✅ Database initialization successful');
+        } else {
+            console.error('❌ Database initialization failed');
+            process.exit(1);
+        }
+    } catch (error) {
+        console.error('❌ Server initialization failed:', error);
         process.exit(1);
-    } else {
-        console.log('✅ Connected to SQLite database');
-        createEnhancedTables();
     }
-});
+}
+
+// Initialize server on startup
+initializeServer();
 
 // Enhanced table creation with new features
 function createEnhancedTables() {
@@ -361,7 +373,7 @@ app.get('/api/players', (req, res) => {
 });
 
 // Enhanced player creation/update
-app.post('/api/players', (req, res) => {
+app.post('/api/players', async (req, res) => {
     console.log('🔍 POST /api/players called with body:', req.body);
     
     const { 
@@ -395,42 +407,38 @@ app.post('/api/players', (req, res) => {
         current_score
     });
     
-    const query = `
-        INSERT OR REPLACE INTO players 
-        (wallet_address, username, level, total_score, boom_tokens, lives, current_score, 
-         experience_points, games_played, games_won, total_enemies_killed, total_bombs_used, 
-         last_updated, last_login)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-    `;
-    
-    const params = [wallet_address, username, level, total_score, boom_tokens, lives, current_score,
-                   experience_points, games_played, games_won, total_enemies_killed, total_bombs_used];
-    
-    console.log('🔍 Executing query with params:', params);
-    
-    db.run(query, params, function(err) {
-        if (err) {
-            console.error('❌ Database error in POST /api/players:', err);
-            console.error('❌ Error details:', {
-                code: err.code,
-                message: err.message,
-                stack: err.stack
-            });
-            res.status(500).json({ error: err.message, details: err.code });
-            return;
-        }
+    try {
+        const playerData = {
+            wallet_address,
+            username,
+            level,
+            total_score,
+            boom_tokens,
+            lives,
+            current_score,
+            experience_points,
+            games_played,
+            games_won,
+            total_enemies_killed,
+            total_bombs_used
+        };
         
-        console.log('✅ Player data saved successfully, lastID:', this.lastID);
+        const savedPlayer = await savePlayer(playerData);
         
-        // Check for achievements
-        checkAndAwardAchievements(wallet_address);
+        // Update leaderboard
+        await updateLeaderboard(savedPlayer);
+        
+        console.log('✅ Player data saved successfully:', savedPlayer.id);
         
         res.json({ 
             success: true, 
             message: 'Player data saved successfully',
-            id: this.lastID 
+            id: savedPlayer.id 
         });
-    });
+    } catch (error) {
+        console.error('❌ Database error in POST /api/players:', error);
+        res.status(500).json({ error: error.message });
+    }
 });
 
 // Start game session
@@ -1006,26 +1014,25 @@ app.get('/api/players/:walletAddress/sessions', (req, res) => {
 });
 
 // Health check with detailed status
-app.get('/api/health', (req, res) => {
-    db.get('SELECT COUNT(*) as player_count FROM players', [], (err, result) => {
-        if (err) {
-            res.status(500).json({ 
-                status: 'unhealthy', 
-                timestamp: new Date().toISOString(),
-                database: 'error',
-                error: err.message
-            });
-            return;
-        }
+app.get('/api/health', async (req, res) => {
+    try {
+        const health = await healthCheck();
+        const players = await getAllPlayers(1, 0);
         
         res.json({ 
-            status: 'healthy', 
+            ...health,
             timestamp: new Date().toISOString(),
-            database: 'connected',
-            player_count: result.player_count,
+            player_count: players.length,
             uptime: process.uptime()
         });
-    });
+    } catch (error) {
+        res.status(500).json({ 
+            status: 'unhealthy', 
+            timestamp: new Date().toISOString(),
+            database: 'error',
+            error: error.message
+        });
+    }
 });
 
 // Background task to complete expired recharges
