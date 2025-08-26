@@ -6,20 +6,29 @@ let pgPool = null;
 let usePostgres = false;
 
 try {
-    pgPool = new Pool({
+    const config = {
         user: process.env.POSTGRES_USER || 'postgres',
         host: process.env.POSTGRES_HOST || 'localhost',
         database: process.env.POSTGRES_DB || 'kaboom_game',
         password: process.env.POSTGRES_PASSWORD || 'password',
-        port: process.env.POSTGRES_PORT || 5432,
+        port: parseInt(process.env.POSTGRES_PORT) || 5432,
         max: 20, // Maximum number of clients in the pool
         idleTimeoutMillis: 30000,
-        connectionTimeoutMillis: 2000,
+        connectionTimeoutMillis: 10000, // Increased timeout
+    };
+    
+    console.log('🔍 PostgreSQL config:', {
+        user: config.user,
+        host: config.host,
+        database: config.database,
+        port: config.port
     });
+    
+    pgPool = new Pool(config);
     usePostgres = true;
     console.log('✅ PostgreSQL pool created');
 } catch (error) {
-    console.warn('⚠️ PostgreSQL not available, falling back to SQLite:', error.message);
+    console.warn('⚠️ PostgreSQL not available:', error.message);
     usePostgres = false;
 }
 
@@ -43,6 +52,11 @@ try {
 // Database initialization
 async function initializeDatabase() {
     try {
+        if (!pgPool) {
+            console.error('❌ PostgreSQL pool not available');
+            return false;
+        }
+        
         // Test PostgreSQL connection
         const client = await pgPool.connect();
         console.log('✅ PostgreSQL connected successfully');
@@ -51,9 +65,15 @@ async function initializeDatabase() {
         await createTables(client);
         client.release();
         
-        // Test Redis connection
-        await redisClient.connect();
-        console.log('✅ Redis connected successfully');
+        // Test Redis connection if available
+        if (redisClient) {
+            try {
+                await redisClient.connect();
+                console.log('✅ Redis connected successfully');
+            } catch (redisError) {
+                console.warn('⚠️ Redis connection failed, continuing without Redis:', redisError.message);
+            }
+        }
         
         return true;
     } catch (error) {
