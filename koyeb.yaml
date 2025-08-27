@@ -7,6 +7,10 @@ env:
     value: 8000
   - name: ENABLE_BLOCKCHAIN
     value: true
+  - name: ADMIN_USERNAME
+    value: admin
+  - name: ADMIN_PASSWORD
+    value: kaboom2024
 build:
   builder: nodejs
   buildCommand: npm install
@@ -16,7 +20,7 @@ routes:
     protocol: http
     port: 8000
 healthcheck:
-  path: /api/health
+  path: /api/healthz
   port: 8000
   interval: 30s
   timeout: 10s
