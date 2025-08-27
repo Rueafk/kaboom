@@ -78,7 +78,50 @@ app.get('/blockchain-admin', (req, res) => {
     res.sendFile(path.join(__dirname, 'blockchain-admin.html'));
 });
 
-app.use(express.static('.'));
+// Serve static files with proper error handling
+app.use(express.static('.', {
+    setHeaders: (res, path) => {
+        // Set proper MIME types for common file types
+        if (path.endsWith('.js')) {
+            res.setHeader('Content-Type', 'application/javascript');
+        } else if (path.endsWith('.css')) {
+            res.setHeader('Content-Type', 'text/css');
+        } else if (path.endsWith('.woff2') || path.endsWith('.woff')) {
+            res.setHeader('Content-Type', 'font/woff2');
+        }
+    },
+    fallthrough: false // Don't fall through to next middleware if file not found
+}));
+
+// Handle missing assets gracefully
+app.get('*.woff2', (req, res) => {
+    console.log(`Font file requested but not found: ${req.path}`);
+    res.status(404).send('Font not found');
+});
+
+app.get('*.woff', (req, res) => {
+    console.log(`Font file requested but not found: ${req.path}`);
+    res.status(404).send('Font not found');
+});
+
+// Handle missing JavaScript assets
+app.get('*.js', (req, res, next) => {
+    if (req.path.includes('browser-ponyfill') || req.path.includes('utils-C-QmA_tl')) {
+        console.log(`JavaScript file requested but not found: ${req.path}`);
+        return res.status(404).send('Script not found');
+    }
+    next();
+});
+
+// Handle 404 for static files gracefully
+app.use((req, res, next) => {
+    if (req.path.includes('.') && !req.path.startsWith('/api')) {
+        // This is a static file request that wasn't found
+        console.log(`404: Static file not found: ${req.path}`);
+        return res.status(404).send('File not found');
+    }
+    next();
+});
 
 // Simple test endpoint
 app.get('/test', (req, res) => {
