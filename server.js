@@ -27,21 +27,26 @@ app.use(cors({
         }
         
         console.log(`🔗 CORS: Checking origin: ${origin}`);
-        console.log(`🔗 CORS: Allowed origins: ${JSON.stringify(allowedOrigins)}`);
         
         // In production, allow all koyeb.app subdomains
         if (NODE_ENV === 'production' && origin.includes('koyeb.app')) {
             console.log(`🔗 CORS: Production - allowing koyeb.app origin: ${origin}`);
-            callback(null, true);
-        } else if (allowedOrigins.indexOf(origin) !== -1) {
-            console.log(`🔗 CORS: Origin ${origin} is allowed`);
-            callback(null, true);
-        } else {
-            console.log(`🔗 CORS: Origin ${origin} is NOT allowed`);
-            callback(new Error('Not allowed by CORS'));
+            return callback(null, true);
         }
+        
+        // Check against allowed origins
+        if (allowedOrigins.indexOf(origin) !== -1) {
+            console.log(`🔗 CORS: Origin ${origin} is allowed`);
+            return callback(null, true);
+        }
+        
+        console.log(`🔗 CORS: Origin ${origin} is NOT allowed`);
+        console.log(`🔗 CORS: Allowed origins: ${JSON.stringify(allowedOrigins)}`);
+        return callback(new Error('Not allowed by CORS'));
     },
-    credentials: true
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
 }));
 app.use(bodyParser.json({ limit: '10mb' }));
 
@@ -769,16 +774,6 @@ app.post('/api/blockchain/force-sync', async (req, res) => {
 
 // Enable blockchain storage
 app.post('/api/blockchain/enable', async (req, res) => {
-    // Set CORS headers explicitly
-    res.header('Access-Control-Allow-Origin', '*');
-    res.header('Access-Control-Allow-Methods', 'POST, OPTIONS');
-    res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-    
-    // Handle preflight requests
-    if (req.method === 'OPTIONS') {
-        return res.status(200).end();
-    }
-    
     try {
         console.log('🔗 Enable blockchain request received');
         console.log('📊 Blockchain initialized:', blockchainInitialized);
@@ -800,16 +795,6 @@ app.post('/api/blockchain/enable', async (req, res) => {
 
 // Disable blockchain storage
 app.post('/api/blockchain/disable', async (req, res) => {
-    // Set CORS headers explicitly
-    res.header('Access-Control-Allow-Origin', '*');
-    res.header('Access-Control-Allow-Methods', 'POST, OPTIONS');
-    res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-    
-    // Handle preflight requests
-    if (req.method === 'OPTIONS') {
-        return res.status(200).end();
-    }
-    
     try {
         console.log('🔗 Disable blockchain request received');
         console.log('📊 Blockchain initialized:', blockchainInitialized);
@@ -831,16 +816,6 @@ app.post('/api/blockchain/disable', async (req, res) => {
 
 // Clear sync queue
 app.post('/api/blockchain/clear-queue', async (req, res) => {
-    // Set CORS headers explicitly
-    res.header('Access-Control-Allow-Origin', '*');
-    res.header('Access-Control-Allow-Methods', 'POST, OPTIONS');
-    res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-    
-    // Handle preflight requests
-    if (req.method === 'OPTIONS') {
-        return res.status(200).end();
-    }
-    
     try {
         if (!blockchainInitialized || !blockchainManager) {
             return res.status(503).json({ error: 'Blockchain service not available' });
