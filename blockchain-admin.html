@@ -612,8 +612,12 @@
         async function enableBlockchain() {
             if (confirm('Enable blockchain storage? This will start storing player data on the Solana blockchain.')) {
                 try {
+                    const url = `${API_BASE}/blockchain/enable`;
                     console.log('🔗 Enabling blockchain storage...');
-                    const response = await fetch(`${API_BASE}/blockchain/enable`, {
+                    console.log('🔗 URL being called:', url);
+                    console.log('🔗 API_BASE:', API_BASE);
+                    
+                    const response = await fetch(url, {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json',
@@ -622,8 +626,23 @@
                     });
                     
                     console.log('🔗 Response status:', response.status);
-                    const result = await response.json();
-                    console.log('🔗 Response data:', result);
+                    console.log('🔗 Response headers:', response.headers);
+                    
+                    // Get the raw text first to debug
+                    const responseText = await response.text();
+                    console.log('🔗 Raw response text:', responseText);
+                    
+                    // Try to parse as JSON
+                    let result;
+                    try {
+                        result = JSON.parse(responseText);
+                        console.log('🔗 Parsed JSON result:', result);
+                    } catch (parseError) {
+                        console.error('❌ JSON parse error:', parseError);
+                        console.error('❌ Response was not valid JSON:', responseText);
+                        alert('❌ Server returned invalid JSON. Please check the console for details.');
+                        return;
+                    }
                     
                     if (result.success) {
                         alert('✅ Blockchain storage enabled successfully');
