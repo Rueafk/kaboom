@@ -4,12 +4,21 @@ const cors = require('cors');
 const bodyParser = require('body-parser');
 const crypto = require('crypto');
 const sqlite3 = require('sqlite3').verbose();
+const { createServer } = require('http');
+const { Server } = require('socket.io');
 require('dotenv').config();
 
 // Import blockchain services
 const BlockchainDataManager = require('./web3/blockchain-data-manager');
 
 const app = express();
+const server = createServer(app);
+const io = new Server(server, {
+    cors: {
+        origin: ["http://localhost:3000", "http://localhost:8000", "https://*.koyeb.app"],
+        methods: ["GET", "POST"]
+    }
+});
 const PORT = process.env.PORT || 8000;
 const NODE_ENV = process.env.NODE_ENV || 'development';
 
@@ -1024,6 +1033,416 @@ app.get('/api/health', (req, res) => {
     });
 });
 
+// Health check for Koyeb
+app.get('/api/healthz', (req, res) => {
+    res.json({ 
+        status: 'healthy',
+        timestamp: new Date().toISOString(),
+        uptime: process.uptime()
+    });
+});
+
+// Admin authentication
+app.post('/api/admin/login', async (req, res) => {
+    try {
+        const { username, password } = req.body;
+        
+        // Simple admin credentials (in production, use environment variables)
+        const adminUsername = process.env.ADMIN_USERNAME || 'admin';
+        const adminPassword = process.env.ADMIN_PASSWORD || 'kaboom2024';
+        
+        if (username === adminUsername && password === adminPassword) {
+            // Generate a simple JWT-like token (in production, use proper JWT)
+            const token = Buffer.from(`${username}:${Date.now()}`).toString('base64');
+            
+            res.json({
+                success: true,
+                token: token,
+                message: 'Login successful'
+            });
+        } else {
+            res.status(401).json({
+                success: false,
+                error: 'Invalid credentials'
+            });
+        }
+    } catch (error) {
+        console.error('❌ Admin login error:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Submit score endpoint
+app.post('/api/submit-score', async (req, res) => {
+    console.log('📊 Submit score request received:', req.body);
+    
+    if (!dbInitialized) {
+        console.log('⚠️ Database not initialized, returning fallback response');
+        return res.json({
+            success: true,
+            message: 'Score submitted successfully (fallback mode)',
+            id: Date.now()
+        });
+    }
+    
+    try {
+        const { wallet, score, tokens, matchId, clientSig, metadata } = req.body;
+        
+        if (!wallet || score === undefined) {
+            console.log('❌ Missing wallet or score in request');
+            return res.status(400).json({ error: 'Wallet and score are required' });
+        }
+        
+        console.log(`💾 Submitting score for wallet: ${wallet}, Score: ${score}, Tokens: ${tokens}`);
+        
+        // Update player's total score and tokens
+        const updateQuery = `
+            UPDATE players 
+            SET total_score = total_score + ?,
+                boom_tokens = boom_tokens + ?,
+                current_score = ?,
+                games_played = games_played + 1,
+                last_updated = CURRENT_TIMESTAMP,
+                last_active_at = CURRENT_TIMESTAMP
+            WHERE wallet_address = ?
+        `;
+        
+        db.run(updateQuery, [score, tokens || 0, score, wallet], async function(err) {
+            if (err) {
+                console.error('❌ Error updating player score:', err);
+                return res.status(500).json({ error: err.message });
+            }
+            
+            console.log(`✅ Score updated for wallet: ${wallet}`);
+            
+            // Emit real-time update to admin dashboard
+            emitAdminUpdate('new_score', {
+                wallet: wallet,
+                score: score,
+                tokens: tokens || 0,
+                matchId: matchId
+            });
+            
+            // Also store on blockchain if available
+            let blockchainResult = null;
+            if (blockchainInitialized && blockchainManager) {
+                try {
+                    console.log('🔗 Attempting to store score on blockchain...');
+                    const scoreData = {
+                        wallet_address: wallet,
+                        score: score,
+                        tokens: tokens || 0,
+                        match_id: matchId,
+                        metadata: metadata
+                    };
+                    blockchainResult = await blockchainManager.storeScore(scoreData);
+                    console.log('🔗 Score also stored on blockchain:', blockchainResult);
+                } catch (blockchainError) {
+                    console.error('❌ Error storing score on blockchain:', blockchainError);
+                    blockchainResult = { error: blockchainError.message };
+                }
+            }
+            
+            res.json({
+                success: true,
+                message: 'Score submitted successfully',
+                score: score,
+                tokens: tokens || 0,
+                blockchain: blockchainResult
+            });
+        });
+    } catch (error) {
+        console.error('❌ Error in submit score endpoint:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Admin dashboard stats
+app.get('/api/admin/stats', async (req, res) => {
+    if (!dbInitialized) {
+        return res.json({
+            totalPlayers: 0,
+            activePlayers24h: 0,
+            totalScore: 0,
+            totalTokens: 0,
+            gamesPlayedToday: 0,
+            averageScore: 0
+        });
+    }
+    
+    try {
+        // Get total players
+        db.get('SELECT COUNT(*) as total FROM players', (err, totalRow) => {
+            if (err) {
+                console.error('❌ Error getting total players:', err);
+                return res.status(500).json({ error: err.message });
+            }
+            
+            // Get active players in last 24h
+            const activeQuery = `
+                SELECT COUNT(*) as active 
+                FROM players 
+                WHERE last_active_at >= datetime('now', '-1 day')
+            `;
+            
+            db.get(activeQuery, (err, activeRow) => {
+                if (err) {
+                    console.error('❌ Error getting active players:', err);
+                    return res.status(500).json({ error: err.message });
+                }
+                
+                // Get total score and tokens
+                db.get('SELECT SUM(total_score) as totalScore, SUM(boom_tokens) as totalTokens FROM players', (err, statsRow) => {
+                    if (err) {
+                        console.error('❌ Error getting stats:', err);
+                        return res.status(500).json({ error: err.message });
+                    }
+                    
+                    // Get games played today
+                    const gamesQuery = `
+                        SELECT COUNT(*) as gamesToday 
+                        FROM game_sessions 
+                        WHERE session_start >= date('now')
+                    `;
+                    
+                    db.get(gamesQuery, (err, gamesRow) => {
+                        if (err) {
+                            console.error('❌ Error getting games today:', err);
+                            return res.status(500).json({ error: err.message });
+                        }
+                        
+                        // Calculate average score
+                        const avgQuery = `
+                            SELECT AVG(total_score) as avgScore 
+                            FROM players 
+                            WHERE total_score > 0
+                        `;
+                        
+                        db.get(avgQuery, (err, avgRow) => {
+                            if (err) {
+                                console.error('❌ Error getting average score:', err);
+                                return res.status(500).json({ error: err.message });
+                            }
+                            
+                            res.json({
+                                totalPlayers: totalRow.total || 0,
+                                activePlayers24h: activeRow.active || 0,
+                                totalScore: statsRow.totalScore || 0,
+                                totalTokens: statsRow.totalTokens || 0,
+                                gamesPlayedToday: gamesRow.gamesToday || 0,
+                                averageScore: Math.round(avgRow.avgScore || 0)
+                            });
+                        });
+                    });
+                });
+            });
+        });
+    } catch (error) {
+        console.error('❌ Error in admin stats endpoint:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Admin leaderboard
+app.get('/api/admin/leaderboard', async (req, res) => {
+    if (!dbInitialized) {
+        return res.json({
+            leaderboard: [],
+            metric: req.query.metric || 'score',
+            limit: parseInt(req.query.limit) || 50
+        });
+    }
+    
+    try {
+        const metric = req.query.metric || 'score';
+        const limit = parseInt(req.query.limit) || 50;
+        
+        let orderBy = 'total_score DESC';
+        if (metric === 'tokens') {
+            orderBy = 'boom_tokens DESC';
+        }
+        
+        const query = `
+            SELECT wallet_address, username, total_score, boom_tokens, games_played, last_active_at
+            FROM players 
+            ORDER BY ${orderBy}
+            LIMIT ?
+        `;
+        
+        db.all(query, [limit], (err, rows) => {
+            if (err) {
+                console.error('❌ Error getting leaderboard:', err);
+                return res.status(500).json({ error: err.message });
+            }
+            
+            const leaderboard = rows.map((row, index) => ({
+                wallet: row.wallet_address,
+                username: row.username,
+                totalScore: row.total_score,
+                boomTokens: row.boom_tokens,
+                gamesPlayed: row.games_played,
+                lastActiveAt: row.last_active_at,
+                rank: index + 1
+            }));
+            
+            res.json({
+                leaderboard: leaderboard,
+                metric: metric,
+                limit: limit
+            });
+        });
+    } catch (error) {
+        console.error('❌ Error in admin leaderboard endpoint:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Admin events
+app.get('/api/admin/events', async (req, res) => {
+    if (!dbInitialized) {
+        return res.json([]);
+    }
+    
+    try {
+        const wallet = req.query.wallet;
+        const from = req.query.from;
+        const to = req.query.to;
+        const limit = parseInt(req.query.limit) || 100;
+        
+        let query = `
+            SELECT gs.*, p.username 
+            FROM game_sessions gs
+            LEFT JOIN players p ON gs.wallet_address = p.wallet_address
+            WHERE 1=1
+        `;
+        let params = [];
+        
+        if (wallet) {
+            query += ` AND gs.wallet_address LIKE ?`;
+            params.push(`%${wallet}%`);
+        }
+        
+        if (from) {
+            query += ` AND gs.session_start >= ?`;
+            params.push(from);
+        }
+        
+        if (to) {
+            query += ` AND gs.session_start <= ?`;
+            params.push(to);
+        }
+        
+        query += ` ORDER BY gs.session_start DESC LIMIT ?`;
+        params.push(limit);
+        
+        db.all(query, params, (err, rows) => {
+            if (err) {
+                console.error('❌ Error getting events:', err);
+                return res.status(500).json({ error: err.message });
+            }
+            
+            const events = rows.map(row => ({
+                id: row.id,
+                playerId: row.wallet_address,
+                type: 'game_end',
+                value: row.final_score,
+                matchId: row.session_id,
+                metadata: {
+                    enemiesKilled: row.enemies_killed,
+                    bombsUsed: row.bombs_used,
+                    sessionDuration: row.session_end ? 
+                        new Date(row.session_end) - new Date(row.session_start) : null
+                },
+                createdAt: row.session_start
+            }));
+            
+            res.json(events);
+        });
+    } catch (error) {
+        console.error('❌ Error in admin events endpoint:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Admin export CSV
+app.get('/api/admin/export.csv', async (req, res) => {
+    if (!dbInitialized) {
+        return res.status(503).json({ error: 'Database not available' });
+    }
+    
+    try {
+        const search = req.query.search;
+        const from = req.query.from;
+        const to = req.query.to;
+        const minScore = req.query.minScore;
+        
+        let query = `SELECT * FROM players WHERE 1=1`;
+        let params = [];
+        
+        if (search) {
+            query += ` AND (username LIKE ? OR wallet_address LIKE ?)`;
+            params.push(`%${search}%`, `%${search}%`);
+        }
+        
+        if (from) {
+            query += ` AND created_at >= ?`;
+            params.push(from);
+        }
+        
+        if (to) {
+            query += ` AND created_at <= ?`;
+            params.push(to);
+        }
+        
+        if (minScore) {
+            query += ` AND total_score >= ?`;
+            params.push(minScore);
+        }
+        
+        query += ` ORDER BY total_score DESC`;
+        
+        db.all(query, params, (err, rows) => {
+            if (err) {
+                console.error('❌ Error exporting data:', err);
+                return res.status(500).json({ error: err.message });
+            }
+            
+            // Convert to CSV
+            const headers = [
+                'Wallet', 'Username', 'Level', 'Total Score', 'Boom Tokens', 
+                'Lives', 'Games Played', 'Games Won', 'Highest Level', 
+                'Total Enemies Killed', 'Total Bombs Used', 'Last Active', 'Created At'
+            ];
+            
+            const csvData = [
+                headers.join(','),
+                ...rows.map(row => [
+                    row.wallet_address,
+                    row.username || '',
+                    row.level,
+                    row.total_score,
+                    row.boom_tokens,
+                    row.lives,
+                    row.games_played,
+                    row.games_won,
+                    row.highest_level_reached,
+                    row.total_enemies_killed,
+                    row.total_bombs_used,
+                    row.last_active_at,
+                    row.created_at
+                ].join(','))
+            ].join('\n');
+            
+            res.setHeader('Content-Type', 'text/csv');
+            res.setHeader('Content-Disposition', `attachment; filename="kaboom-players-${new Date().toISOString().split('T')[0]}.csv"`);
+            res.send(csvData);
+        });
+    } catch (error) {
+        console.error('❌ Error in export endpoint:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
 // Detailed health check with database
 app.get('/api/health/detailed', async (req, res) => {
     try {
@@ -1091,13 +1510,39 @@ function completeExpiredRecharges() {
     });
 }
 
+// WebSocket connection handling
+io.on('connection', (socket) => {
+    console.log('🔌 Client connected:', socket.id);
+    
+    // Join admin room
+    socket.on('join-admin', () => {
+        socket.join('admin');
+        console.log('👤 Admin joined dashboard');
+    });
+    
+    // Handle disconnect
+    socket.on('disconnect', () => {
+        console.log('🔌 Client disconnected:', socket.id);
+    });
+});
+
+// Function to emit real-time updates to admin dashboard
+function emitAdminUpdate(type, data) {
+    io.to('admin').emit('admin-update', {
+        type: type,
+        data: data,
+        timestamp: new Date().toISOString()
+    });
+}
+
 // Start server with enhanced logging
-const server = app.listen(PORT, () => {
+server.listen(PORT, () => {
     console.log(`🚀 Enhanced Kaboom Server running on port ${PORT}`);
     console.log(`📊 Admin Dashboard: http://localhost:${PORT}/admin`);
     console.log(`🎯 Game: http://localhost:${PORT}/`);
     console.log(`⚡ Health Check: http://localhost:${PORT}/api/health`);
     console.log(`🧪 Test Endpoint: http://localhost:${PORT}/test`);
+    console.log(`🔌 WebSocket: ws://localhost:${PORT}`);
     
     // Complete any expired recharges on server start
     completeExpiredRecharges();
