@@ -80,6 +80,65 @@
             font-size: 1.5em;
         }
         
+        .search-section {
+            margin-bottom: 20px;
+            padding: 15px;
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 10px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        
+        .search-box {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+        
+        .search-box input {
+            flex: 1;
+            padding: 12px;
+            border: none;
+            border-radius: 8px;
+            background: rgba(255, 255, 255, 0.9);
+            color: #333;
+            font-size: 14px;
+        }
+        
+        .search-box input:focus {
+            outline: none;
+            box-shadow: 0 0 10px rgba(255, 215, 0, 0.5);
+        }
+        
+        .search-btn, .clear-btn {
+            padding: 12px 20px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: all 0.3s ease;
+        }
+        
+        .search-btn {
+            background: linear-gradient(45deg, #00ff88, #00cc6a);
+            color: #1e3c72;
+        }
+        
+        .clear-btn {
+            background: linear-gradient(45deg, #ff4444, #cc3333);
+            color: white;
+        }
+        
+        .search-btn:hover, .clear-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+        }
+        
+        .search-info {
+            color: #ffd700;
+            font-size: 14px;
+        }
+        
         .player-table {
             width: 100%;
             border-collapse: collapse;
@@ -247,6 +306,19 @@
                     
         <div class="players-section">
             <h2>👥 Player Database</h2>
+            
+            <!-- Search Section -->
+            <div class="search-section">
+                <div class="search-box">
+                    <input type="text" id="searchInput" placeholder="🔍 Search by wallet address or username..." />
+                    <button onclick="searchPlayers()" class="search-btn">🔍 Search</button>
+                    <button onclick="clearSearch()" class="clear-btn">❌ Clear</button>
+                </div>
+                <div class="search-info">
+                    <span id="searchResults">Showing all players</span>
+                </div>
+            </div>
+            
             <div id="playersTable">
                 <div class="loading">Loading players...</div>
             </div>
@@ -483,6 +555,74 @@
                 errorDiv.remove();
             }, 5000);
         }
+        
+        // Search functionality
+        let currentSearchTerm = '';
+        
+        async function searchPlayers() {
+            const searchInput = document.getElementById('searchInput');
+            const searchTerm = searchInput.value.trim();
+            
+            if (!searchTerm) {
+                clearSearch();
+                return;
+            }
+            
+            currentSearchTerm = searchTerm;
+            console.log('🔍 Searching for:', searchTerm);
+            
+            try {
+                const response = await fetch(`${API_BASE}/players?search=${encodeURIComponent(searchTerm)}`);
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                
+                const data = await response.json();
+                console.log('🔍 Search results:', data);
+                
+                updatePlayersTable(data.players);
+                updateSearchInfo(data.players.length, searchTerm);
+                
+            } catch (error) {
+                console.error('❌ Search error:', error);
+                showError('Search failed: ' + error.message);
+            }
+        }
+        
+        function clearSearch() {
+            const searchInput = document.getElementById('searchInput');
+            searchInput.value = '';
+            currentSearchTerm = '';
+            
+            // Refresh to show all players
+            refreshData();
+            updateSearchInfo(null, '');
+        }
+        
+        function updateSearchInfo(resultCount, searchTerm) {
+            const searchResults = document.getElementById('searchResults');
+            
+            if (searchTerm) {
+                if (resultCount !== null) {
+                    searchResults.textContent = `Found ${resultCount} player(s) matching "${searchTerm}"`;
+                } else {
+                    searchResults.textContent = `Searching for "${searchTerm}"...`;
+                }
+            } else {
+                searchResults.textContent = 'Showing all players';
+            }
+        }
+        
+        // Add enter key support for search
+        document.addEventListener('DOMContentLoaded', function() {
+            const searchInput = document.getElementById('searchInput');
+            searchInput.addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') {
+                    searchPlayers();
+                }
+            });
+        });
         
         // Initialize on load
         document.addEventListener('DOMContentLoaded', initDashboard);
