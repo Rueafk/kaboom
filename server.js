@@ -157,14 +157,16 @@ function initializeDatabase() {
 }
 
 // Initialize blockchain manager
-function initializeBlockchain() {
+async function initializeBlockchain() {
     try {
         blockchainManager = new BlockchainDataManager();
         blockchainInitialized = true;
         console.log('✅ Blockchain manager initialized');
+        return true;
     } catch (error) {
         console.error('❌ Blockchain manager initialization failed:', error);
         blockchainInitialized = false;
+        return false;
     }
 }
 
@@ -173,10 +175,16 @@ Promise.all([
     initializeDatabase().catch(err => {
         console.error('❌ Database initialization failed:', err);
         dbInitialized = false;
+        return false;
     }),
-    initializeBlockchain()
-]).then(() => {
+    initializeBlockchain().catch(err => {
+        console.error('❌ Blockchain initialization failed:', err);
+        blockchainInitialized = false;
+        return false;
+    })
+]).then(([dbSuccess, blockchainSuccess]) => {
     console.log('🚀 All services initialized');
+    console.log(`📊 Database: ${dbSuccess ? '✅' : '❌'}, Blockchain: ${blockchainSuccess ? '✅' : '❌'}`);
 });
 
 // Enhanced API endpoints with SQLite
@@ -772,7 +780,12 @@ app.post('/api/blockchain/enable', async (req, res) => {
     }
     
     try {
+        console.log('🔗 Enable blockchain request received');
+        console.log('📊 Blockchain initialized:', blockchainInitialized);
+        console.log('📊 Blockchain manager:', blockchainManager ? 'exists' : 'null');
+        
         if (!blockchainInitialized || !blockchainManager) {
+            console.log('❌ Blockchain service not available');
             return res.status(503).json({ error: 'Blockchain service not available' });
         }
         
@@ -780,6 +793,7 @@ app.post('/api/blockchain/enable', async (req, res) => {
         console.log('✅ Blockchain storage enabled via admin dashboard');
         res.json({ success: true, message: 'Blockchain storage enabled' });
     } catch (error) {
+        console.error('❌ Error enabling blockchain:', error);
         res.status(500).json({ error: error.message });
     }
 });
@@ -797,7 +811,12 @@ app.post('/api/blockchain/disable', async (req, res) => {
     }
     
     try {
+        console.log('🔗 Disable blockchain request received');
+        console.log('📊 Blockchain initialized:', blockchainInitialized);
+        console.log('📊 Blockchain manager:', blockchainManager ? 'exists' : 'null');
+        
         if (!blockchainInitialized || !blockchainManager) {
+            console.log('❌ Blockchain service not available');
             return res.status(503).json({ error: 'Blockchain service not available' });
         }
         
@@ -805,6 +824,7 @@ app.post('/api/blockchain/disable', async (req, res) => {
         console.log('⚠️ Blockchain storage disabled via admin dashboard');
         res.json({ success: true, message: 'Blockchain storage disabled' });
     } catch (error) {
+        console.error('❌ Error disabling blockchain:', error);
         res.status(500).json({ error: error.message });
     }
 });
