@@ -6053,7 +6053,7 @@ window.startGame = async function() {
 				}
 			},
 			
-			// Load player profile from blockchain storage
+			// Load player profile from database via PlayerDataManager
 			async loadPlayerProfile() {
 				try {
 					const playerAddress = this.getPlayerAddress();
@@ -6062,25 +6062,29 @@ window.startGame = async function() {
 						return null;
 					}
 					
-					// Use localStorage as blockchain simulation (in real implementation, this would be on-chain)
-					const storageKey = `kaboom_${playerAddress}`;
-					const saved = localStorage.getItem(storageKey);
-					
-					if (saved) {
-						const profile = JSON.parse(saved);
-						console.log('📂 Loaded existing player profile from blockchain storage');
-						console.log(`💰 Current tokens: ${profile.boomTokens}`);
-						return profile;
+					// Use PlayerDataManager to load from database
+					if (window.playerDataManager) {
+						console.log('📂 Loading player profile via PlayerDataManager...');
+						const profile = await window.playerDataManager.loadPlayerProfile(playerAddress);
+						if (profile) {
+							console.log('✅ Player profile loaded from database successfully');
+							console.log(`💰 Current tokens: ${profile.boomTokens}`);
+							return profile;
+						} else {
+							console.log('📝 No existing profile found in database');
+							return null;
+						}
+					} else {
+						console.error('❌ PlayerDataManager not available');
+						return null;
 					}
-					
-					return null;
 				} catch (error) {
 					console.error('❌ Failed to load player profile:', error);
 					return null;
 				}
 			},
 			
-			// Save player profile to blockchain storage
+			// Save player profile to database via PlayerDataManager
 			async savePlayerProfile(profile) {
 				try {
 					const playerAddress = this.getPlayerAddress();
@@ -6093,13 +6097,22 @@ window.startGame = async function() {
 					profile.lastLogin = new Date().toISOString();
 					profile.updatedAt = new Date().toISOString();
 					
-					// Save to blockchain storage (localStorage simulation)
-					const storageKey = `kaboom_${playerAddress}`;
-					localStorage.setItem(storageKey, JSON.stringify(profile));
-					
-					console.log('💾 Player profile saved to blockchain storage');
-					console.log(`💰 Updated tokens: ${profile.boomTokens}`);
-					return true;
+					// Use PlayerDataManager to save to database
+					if (window.playerDataManager) {
+						console.log('💾 Saving player profile via PlayerDataManager...');
+						const result = await window.playerDataManager.savePlayerProfile(profile);
+						if (result.success) {
+							console.log('✅ Player profile saved to database successfully');
+							console.log(`💰 Updated tokens: ${profile.boomTokens}`);
+							return true;
+						} else {
+							console.error('❌ Failed to save player profile to database:', result.error);
+							return false;
+						}
+					} else {
+						console.error('❌ PlayerDataManager not available');
+						return false;
+					}
 				} catch (error) {
 					console.error('❌ Failed to save player profile:', error);
 					return false;
