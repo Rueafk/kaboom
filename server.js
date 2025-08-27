@@ -50,6 +50,11 @@ app.use(cors({
 }));
 app.use(bodyParser.json({ limit: '10mb' }));
 
+// Route-level CORS: always allow same-origin and deployed domains for blockchain APIs
+// This bypasses overly strict global CORS checks for these control endpoints
+app.use('/api/blockchain', cors({ origin: true, credentials: true }));
+app.options('/api/blockchain/*', cors({ origin: true, credentials: true }));
+
 // Admin dashboard route - must come BEFORE static file serving
 app.get('/admin', (req, res) => {
     // Set permissive CSP for admin dashboard to allow wallet connections
