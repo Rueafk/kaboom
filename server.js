@@ -78,6 +78,30 @@ app.get('/blockchain-admin', (req, res) => {
     res.sendFile(path.join(__dirname, 'blockchain-admin.html'));
 });
 
+// API Routes - must come BEFORE static file serving
+app.get('/test', (req, res) => {
+    res.json({ 
+        message: 'Server is running!',
+        timestamp: new Date().toISOString(),
+        port: PORT
+    });
+});
+
+// Enhanced health check endpoint for Koyeb
+app.get('/api/healthz', (req, res) => {
+    const health = {
+        status: 'OK',
+        timestamp: new Date().toISOString(),
+        uptime: process.uptime(),
+        environment: NODE_ENV,
+        port: PORT,
+        database: dbInitialized ? 'Connected' : 'Not Connected',
+        blockchain: blockchainInitialized ? 'Connected' : 'Not Connected'
+    };
+    
+    res.status(200).json(health);
+});
+
 // Serve static files with proper error handling
 app.use(express.static('.', {
     setHeaders: (res, path) => {
@@ -123,29 +147,7 @@ app.use((req, res, next) => {
     next();
 });
 
-// Simple test endpoint
-app.get('/test', (req, res) => {
-    res.json({ 
-        message: 'Server is running!',
-        timestamp: new Date().toISOString(),
-        port: PORT
-    });
-});
 
-// Enhanced health check endpoint for Koyeb
-app.get('/api/healthz', (req, res) => {
-    const health = {
-        status: 'OK',
-        timestamp: new Date().toISOString(),
-        uptime: process.uptime(),
-        environment: NODE_ENV,
-        port: PORT,
-        database: dbInitialized ? 'Connected' : 'Not Connected',
-        blockchain: blockchainInitialized ? 'Connected' : 'Not Connected'
-    };
-    
-    res.status(200).json(health);
-});
 
 // Initialize SQLite database
 let db = null;
@@ -1091,14 +1093,7 @@ app.get('/api/health', (req, res) => {
     });
 });
 
-// Health check for Koyeb
-app.get('/api/healthz', (req, res) => {
-    res.json({ 
-        status: 'healthy',
-        timestamp: new Date().toISOString(),
-        uptime: process.uptime()
-    });
-});
+
 
 // Admin authentication
 app.post('/api/admin/login', async (req, res) => {
