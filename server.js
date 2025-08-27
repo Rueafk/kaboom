@@ -349,6 +349,12 @@ Promise.all([
 ]).then(([dbSuccess, blockchainSuccess]) => {
     console.log('🚀 All services initialized');
     console.log(`📊 Database: ${dbSuccess ? '✅' : '❌'}, Blockchain: ${blockchainSuccess ? '✅' : '❌'}`);
+    
+    // Force enable blockchain in production to bypass CORS issues
+    if (blockchainSuccess && blockchainManager && NODE_ENV === 'production') {
+        blockchainManager.setEnabled(true);
+        console.log('🔗 Blockchain force-enabled for production');
+    }
 });
 
 // Enhanced API endpoints with SQLite
