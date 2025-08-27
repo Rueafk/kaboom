@@ -3,6 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
     <title>Blockchain Admin Dashboard - Kaboom Game</title>
     <style>
         * {
@@ -609,10 +612,18 @@
         async function enableBlockchain() {
             if (confirm('Enable blockchain storage? This will start storing player data on the Solana blockchain.')) {
                 try {
+                    console.log('🔗 Enabling blockchain storage...');
                     const response = await fetch(`${API_BASE}/blockchain/enable`, {
-                        method: 'POST'
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Cache-Control': 'no-cache'
+                        }
                     });
+                    
+                    console.log('🔗 Response status:', response.status);
                     const result = await response.json();
+                    console.log('🔗 Response data:', result);
                     
                     if (result.success) {
                         alert('✅ Blockchain storage enabled successfully');
@@ -621,6 +632,7 @@
                         alert('❌ Error enabling blockchain: ' + result.error);
                     }
                 } catch (error) {
+                    console.error('❌ Enable blockchain error:', error);
                     alert('❌ Error: ' + error.message);
                 }
             }
