@@ -39,13 +39,27 @@ class PlayerDataManager {
                     total_score: profile.totalScore || 0,
                     boom_tokens: profile.boomTokens || 0,
                     lives: profile.lives || 3,
-                    current_score: profile.currentScore || 0
+                    current_score: profile.currentScore || 0,
+                    experience_points: profile.experiencePoints || 0,
+                    achievements_unlocked: profile.achievementsUnlocked || 0,
+                    games_played: profile.gamesPlayed || 0,
+                    games_won: profile.gamesWon || 0,
+                    highest_level_reached: profile.highestLevelReached || 1,
+                    total_enemies_killed: profile.totalEnemiesKilled || 0,
+                    total_bombs_used: profile.totalBombsUsed || 0
                 })
             });
             
             if (response.ok) {
                 const result = await response.json();
                 console.log('✅ Player data saved to database:', result);
+                
+                // Check if blockchain storage was successful
+                if (result.blockchain && result.blockchain.success) {
+                    console.log('🔗 Player data also stored on blockchain:', result.blockchain);
+                } else if (result.blockchain && result.blockchain.error) {
+                    console.warn('⚠️ Blockchain storage failed:', result.blockchain.error);
+                }
                 
                 // Also save to localStorage as backup
                 this.saveToLocalStorage(profile);

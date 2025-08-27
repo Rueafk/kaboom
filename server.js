@@ -4,6 +4,10 @@ const cors = require('cors');
 const bodyParser = require('body-parser');
 const crypto = require('crypto');
 const sqlite3 = require('sqlite3').verbose();
+require('dotenv').config();
+
+// Import blockchain services
+const BlockchainDataManager = require('./web3/blockchain-data-manager');
 
 const app = express();
 const PORT = process.env.PORT || 8000;
@@ -12,7 +16,7 @@ const NODE_ENV = process.env.NODE_ENV || 'development';
 // Enhanced middleware with security
 const allowedOrigins = NODE_ENV === 'production' 
     ? ['https://kaboom-game.koyeb.app', 'https://kaboom-game-rueafk.koyeb.app', 'https://favourable-elicia-afk-a1f42961.koyeb.app']
-    : ['http://localhost:3000', 'http://127.0.0.1:3000', 'null', 'file://'];
+    : ['http://localhost:3000', 'http://127.0.0.1:3000', 'http://localhost:8000', 'http://127.0.0.1:8000', 'null', 'file://'];
 
 app.use(cors({
     origin: function (origin, callback) {
@@ -31,7 +35,16 @@ app.use(bodyParser.json({ limit: '10mb' }));
 
 // Admin dashboard route - must come BEFORE static file serving
 app.get('/admin', (req, res) => {
+    // Set permissive CSP for admin dashboard to allow wallet connections
+    res.setHeader('Content-Security-Policy', "default-src 'self' 'unsafe-inline' 'unsafe-eval' data: blob:; connect-src 'self' https: wss:; script-src 'self' 'unsafe-inline' 'unsafe-eval' https:; style-src 'self' 'unsafe-inline' https:; img-src 'self' data: https:; font-src 'self' https:;");
     res.sendFile(path.join(__dirname, 'admin-dashboard.html'));
+});
+
+// Blockchain admin dashboard route
+app.get('/blockchain-admin', (req, res) => {
+    // Set permissive CSP for blockchain admin to allow wallet connections
+    res.setHeader('Content-Security-Policy', "default-src 'self' 'unsafe-inline' 'unsafe-eval' data: blob:; connect-src 'self' https: wss:; script-src 'self' 'unsafe-inline' 'unsafe-eval' https:; style-src 'self' 'unsafe-inline' https:; img-src 'self' data: https:; font-src 'self' https:;");
+    res.sendFile(path.join(__dirname, 'blockchain-admin.html'));
 });
 
 app.use(express.static('.'));
@@ -49,9 +62,17 @@ app.get('/test', (req, res) => {
 let db = null;
 let dbInitialized = false;
 
+// Initialize blockchain data manager
+let blockchainManager = null;
+let blockchainInitialized = false;
+
 function initializeDatabase() {
     return new Promise((resolve, reject) => {
-        db = new sqlite3.Database('./kaboom_game.db', (err) => {
+        // Use production database in production environment
+        const dbPath = NODE_ENV === 'production' ? './kaboom_game_production.db' : './kaboom_game.db';
+        console.log(`🗄️ Using database: ${dbPath} (${NODE_ENV} environment)`);
+        
+        db = new sqlite3.Database(dbPath, (err) => {
             if (err) {
                 console.error('❌ Database connection failed:', err.message);
                 reject(err);
@@ -123,10 +144,27 @@ function initializeDatabase() {
     });
 }
 
-// Initialize database on startup
-initializeDatabase().catch(err => {
-    console.error('❌ Database initialization failed:', err);
-    dbInitialized = false;
+// Initialize blockchain manager
+function initializeBlockchain() {
+    try {
+        blockchainManager = new BlockchainDataManager();
+        blockchainInitialized = true;
+        console.log('✅ Blockchain manager initialized');
+    } catch (error) {
+        console.error('❌ Blockchain manager initialization failed:', error);
+        blockchainInitialized = false;
+    }
+}
+
+// Initialize database and blockchain on startup
+Promise.all([
+    initializeDatabase().catch(err => {
+        console.error('❌ Database initialization failed:', err);
+        dbInitialized = false;
+    }),
+    initializeBlockchain()
+]).then(() => {
+    console.log('🚀 All services initialized');
 });
 
 // Enhanced API endpoints with SQLite
@@ -244,16 +282,29 @@ app.post('/api/players', async (req, res) => {
             playerData.total_bombs_used || 0
         ];
         
-        db.run(query, params, function(err) {
+        db.run(query, params, async function(err) {
             if (err) {
                 console.error('❌ Error saving player:', err);
                 return res.status(500).json({ error: err.message });
             }
             
+            // Also store on blockchain if available
+            let blockchainResult = null;
+            if (blockchainInitialized && blockchainManager) {
+                try {
+                    blockchainResult = await blockchainManager.storePlayerProfile(playerData);
+                    console.log('🔗 Player data also stored on blockchain:', blockchainResult);
+                } catch (blockchainError) {
+                    console.error('❌ Error storing on blockchain:', blockchainError);
+                    blockchainResult = { error: blockchainError.message };
+                }
+            }
+            
             res.json({
                 success: true,
                 message: 'Player data saved successfully',
-                id: this.lastID
+                id: this.lastID,
+                blockchain: blockchainResult
             });
         });
     } catch (error) {
@@ -360,16 +411,37 @@ app.post('/api/sessions/end', async (req, res) => {
             WHERE session_id = ? AND wallet_address = ?
         `;
         
-        db.run(query, [final_score || 0, enemies_killed || 0, bombs_used || 0, session_id, wallet_address], function(err) {
+        db.run(query, [final_score || 0, enemies_killed || 0, bombs_used || 0, session_id, wallet_address], async function(err) {
             if (err) {
                 console.error('❌ Error ending session:', err);
                 return res.status(500).json({ error: err.message });
             }
             
+            // Also store on blockchain if available
+            let blockchainResult = null;
+            if (blockchainInitialized && blockchainManager) {
+                try {
+                    const sessionData = {
+                        session_id: session_id,
+                        wallet_address: wallet_address,
+                        session_end: new Date().toISOString(),
+                        final_score: final_score || 0,
+                        enemies_killed: enemies_killed || 0,
+                        bombs_used: bombs_used || 0
+                    };
+                    blockchainResult = await blockchainManager.storeGameSession(sessionData);
+                    console.log('🔗 Game session also stored on blockchain:', blockchainResult);
+                } catch (blockchainError) {
+                    console.error('❌ Error storing session on blockchain:', blockchainError);
+                    blockchainResult = { error: blockchainError.message };
+                }
+            }
+            
             res.json({
                 success: true,
                 message: 'Game session ended',
-                session: { session_id: session_id }
+                session: { session_id: session_id },
+                blockchain: blockchainResult
             });
         });
     } catch (error) {
@@ -562,6 +634,119 @@ app.put('/api/recharge/lives/:walletAddress', async (req, res) => {
     }
 });
 
+// Blockchain endpoints
+app.get('/api/blockchain/status', async (req, res) => {
+    try {
+        if (!blockchainInitialized || !blockchainManager) {
+            return res.json({
+                status: 'unavailable',
+                message: 'Blockchain service not initialized'
+            });
+        }
+        
+        const status = await blockchainManager.getBlockchainStatus();
+        res.json(status);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+app.post('/api/blockchain/player-profile', async (req, res) => {
+    try {
+        if (!blockchainInitialized || !blockchainManager) {
+            return res.status(503).json({ error: 'Blockchain service not available' });
+        }
+        
+        const playerData = req.body;
+        const result = await blockchainManager.storePlayerProfile(playerData);
+        res.json(result);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+app.post('/api/blockchain/game-session', async (req, res) => {
+    try {
+        if (!blockchainInitialized || !blockchainManager) {
+            return res.status(503).json({ error: 'Blockchain service not available' });
+        }
+        
+        const sessionData = req.body;
+        const result = await blockchainManager.storeGameSession(sessionData);
+        res.json(result);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+app.post('/api/blockchain/award-tokens', async (req, res) => {
+    try {
+        if (!blockchainInitialized || !blockchainManager) {
+            return res.status(503).json({ error: 'Blockchain service not available' });
+        }
+        
+        const { wallet_address, amount, reason } = req.body;
+        const result = await blockchainManager.awardBoomTokens(wallet_address, amount, reason);
+        res.json(result);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+app.get('/api/blockchain/token-balance/:walletAddress', async (req, res) => {
+    try {
+        if (!blockchainInitialized || !blockchainManager) {
+            return res.status(503).json({ error: 'Blockchain service not available' });
+        }
+        
+        const walletAddress = req.params.walletAddress;
+        const result = await blockchainManager.getBoomTokenBalance(walletAddress);
+        res.json(result);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+app.post('/api/blockchain/achievement', async (req, res) => {
+    try {
+        if (!blockchainInitialized || !blockchainManager) {
+            return res.status(503).json({ error: 'Blockchain service not available' });
+        }
+        
+        const achievementData = req.body;
+        const result = await blockchainManager.storeAchievement(achievementData);
+        res.json(result);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+app.get('/api/blockchain/sync-queue', async (req, res) => {
+    try {
+        if (!blockchainInitialized || !blockchainManager) {
+            return res.status(503).json({ error: 'Blockchain service not available' });
+        }
+        
+        const status = blockchainManager.getSyncQueueStatus();
+        res.json(status);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+app.post('/api/blockchain/force-sync', async (req, res) => {
+    try {
+        if (!blockchainInitialized || !blockchainManager) {
+            return res.status(503).json({ error: 'Blockchain service not available' });
+        }
+        
+        await blockchainManager.forceProcessQueue();
+        res.json({ success: true, message: 'Sync queue processed' });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
 // Simple health check for deployment
 app.get('/api/health', (req, res) => {
     res.json({ 
@@ -569,7 +754,8 @@ app.get('/api/health', (req, res) => {
         timestamp: new Date().toISOString(),
         uptime: process.uptime(),
         port: PORT,
-        database: dbInitialized ? 'connected' : 'fallback_mode'
+        database: dbInitialized ? 'connected' : 'fallback_mode',
+        blockchain: blockchainInitialized ? 'connected' : 'fallback_mode'
     });
 });
 

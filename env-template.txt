@@ -1,0 +1,17 @@
+# Blockchain Configuration
+ENABLE_BLOCKCHAIN=true
+SOLANA_RPC_URL=https://api.devnet.solana.com
+
+# Admin wallet private key (base58 encoded)
+# Generate with: node -e "const { Keypair } = require('@solana/web3.js'); console.log(Keypair.generate().secretKey.toString('base64'));"
+ADMIN_PRIVATE_KEY=
+
+# Program IDs (optional - will use defaults if not set)
+PLAYER_PROFILE_PROGRAM_ID=
+GAME_SESSION_PROGRAM_ID=
+ACHIEVEMENT_PROGRAM_ID=
+BOOM_TOKEN_MINT=
+
+# Server Configuration
+PORT=8000
+NODE_ENV=development

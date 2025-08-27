@@ -110,13 +110,22 @@ class GameSessionManager {
                     wallet_address: this.currentWallet,
                     final_score: this.sessionData.score_earned,
                     enemies_killed: this.sessionData.enemies_killed,
-                    bombs_used: this.sessionData.bombs_used
+                    bombs_used: this.sessionData.bombs_used,
+                    level_reached: this.sessionData.level_reached,
+                    survival_time: this.sessionData.survival_time_seconds
                 })
             });
             
             if (response.ok) {
                 const result = await response.json();
                 console.log('🏁 GameSessionManager: Session ended successfully:', result);
+                
+                // Check if blockchain storage was successful
+                if (result.blockchain && result.blockchain.success) {
+                    console.log('🔗 Game session also stored on blockchain:', result.blockchain);
+                } else if (result.blockchain && result.blockchain.error) {
+                    console.warn('⚠️ Blockchain storage failed:', result.blockchain.error);
+                }
                 
                 // Stop real-time updates
                 this.stopRealTimeUpdates();
@@ -126,7 +135,7 @@ class GameSessionManager {
                 this.currentWallet = null;
                 this.sessionStartTime = null;
                 
-                return { success: true, session: result };
+                return { success: true, session: result, blockchain: result.blockchain };
             } else {
                 throw new Error(`Server error: ${response.status}`);
             }
