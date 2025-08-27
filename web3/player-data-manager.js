@@ -21,8 +21,7 @@ class PlayerDataManager {
         console.log('Database connection status:', this.isConnected);
         
         if (!this.isConnected) {
-            console.warn('⚠️ Database offline, saving to localStorage only');
-            this.saveToLocalStorage(profile);
+            console.warn('⚠️ Database offline; local fallback disabled');
             return { success: false, error: 'Database offline' };
         }
         
@@ -60,20 +59,14 @@ class PlayerDataManager {
                 } else if (result.blockchain && result.blockchain.error) {
                     console.warn('⚠️ Blockchain storage failed:', result.blockchain.error);
                 }
-                
-                // Also save to localStorage as backup
-                this.saveToLocalStorage(profile);
-                
+
                 return { success: true, data: result };
             } else {
                 throw new Error(`Server error: ${response.status}`);
             }
         } catch (error) {
             console.error('❌ Error saving to database:', error);
-            
-            // Fallback to localStorage
-            this.saveToLocalStorage(profile);
-            
+
             return { success: false, error: error.message };
         }
     }
@@ -83,8 +76,8 @@ class PlayerDataManager {
     
     async loadPlayerProfile(walletAddress) {
         if (!this.isConnected) {
-            console.warn('⚠️ Database offline, loading from localStorage');
-            return this.loadFromLocalStorage(walletAddress);
+            console.warn('⚠️ Database offline; local fallback disabled');
+            return null;
         }
         
         try {
@@ -118,80 +111,18 @@ class PlayerDataManager {
             }
         } catch (error) {
             console.error('❌ Error loading from database:', error);
-            
-            // Fallback to localStorage
-            return this.loadFromLocalStorage(walletAddress);
-        }
-    }
-    
-    saveToLocalStorage(profile) {
-        try {
-            const storageKey = `kaboom_${profile.walletAddress}`;
-            localStorage.setItem(storageKey, JSON.stringify(profile));
-            console.log('💾 Player data saved to localStorage');
-        } catch (error) {
-            console.error('❌ Error saving to localStorage:', error);
-        }
-    }
-    
-    loadFromLocalStorage(walletAddress) {
-        try {
-            const storageKey = `kaboom_${walletAddress}`;
-            const savedData = localStorage.getItem(storageKey);
-            
-            if (savedData) {
-                const profile = JSON.parse(savedData);
-                console.log('📂 Player data loaded from localStorage:', profile);
-                return profile;
-            }
-            
-            return null;
-        } catch (error) {
-            console.error('❌ Error loading from localStorage:', error);
             return null;
         }
     }
     
-    async syncLocalToDatabase() {
-        if (!this.isConnected) {
-            console.warn('⚠️ Database offline, cannot sync');
-            return;
-        }
-        
-        try {
-            // Find all localStorage entries that start with 'kaboom_'
-            const localProfiles = [];
-            
-            for (let i = 0; i < localStorage.length; i++) {
-                const key = localStorage.key(i);
-                if (key && key.startsWith('kaboom_')) {
-                    const walletAddress = key.replace('kaboom_', '');
-                    const profileData = localStorage.getItem(key);
-                    
-                    if (profileData) {
-                        try {
-                            const profile = JSON.parse(profileData);
-                            localProfiles.push(profile);
-                        } catch (error) {
-                            console.error('❌ Error parsing localStorage data:', error);
-                        }
-                    }
-                }
-            }
-            
-            console.log(`🔄 Syncing ${localProfiles.length} local profiles to database...`);
-            
-            // Sync each profile to database
-            for (const profile of localProfiles) {
-                await this.savePlayerProfile(profile);
-            }
-            
-            console.log('✅ Local profiles synced to database');
-        } catch (error) {
-            console.error('❌ Error syncing to database:', error);
-        }
-    }
+    // Local storage disabled
+    saveToLocalStorage(profile) { /* no-op: disabled */ }
+    
+    loadFromLocalStorage(walletAddress) { return null; }
+    
+    async syncLocalToDatabase() { /* no-op: disabled */ }
 }
 
 // Export for use in other modules
 window.PlayerDataManager = PlayerDataManager;
+
