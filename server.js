@@ -21,11 +21,19 @@ const allowedOrigins = NODE_ENV === 'production'
 app.use(cors({
     origin: function (origin, callback) {
         // Allow requests with no origin (like mobile apps or curl requests)
-        if (!origin) return callback(null, true);
+        if (!origin) {
+            console.log('🔗 CORS: Allowing request with no origin');
+            return callback(null, true);
+        }
+        
+        console.log(`🔗 CORS: Checking origin: ${origin}`);
+        console.log(`🔗 CORS: Allowed origins: ${JSON.stringify(allowedOrigins)}`);
         
         if (allowedOrigins.indexOf(origin) !== -1) {
+            console.log(`🔗 CORS: Origin ${origin} is allowed`);
             callback(null, true);
         } else {
+            console.log(`🔗 CORS: Origin ${origin} is NOT allowed`);
             callback(new Error('Not allowed by CORS'));
         }
     },
