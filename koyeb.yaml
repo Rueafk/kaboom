@@ -1,5 +1,6 @@
 name: kaboom-game
 type: web
+port: 8000
 env:
   - name: NODE_ENV
     value: production
@@ -14,7 +15,7 @@ env:
 build:
   builder: nodejs
   buildCommand: npm install
-  startCommand: node server.js
+  startCommand: npm start
 routes:
   - path: /
     protocol: http
@@ -22,9 +23,9 @@ routes:
 healthcheck:
   path: /api/healthz
   port: 8000
-  interval: 30s
-  timeout: 10s
-  retries: 5
-  initialDelay: 30s
+  interval: 60s
+  timeout: 30s
+  retries: 3
+  initialDelay: 60s
 
 
