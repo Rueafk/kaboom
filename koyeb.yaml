@@ -13,7 +13,7 @@ env:
     value: kaboom2024
 build:
   builder: nodejs
-  buildCommand: npm install
+  buildCommand: npm ci --production=false
   startCommand: npm start
 routes:
   - path: /

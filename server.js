@@ -132,6 +132,21 @@ app.get('/test', (req, res) => {
     });
 });
 
+// Enhanced health check endpoint for Koyeb
+app.get('/api/healthz', (req, res) => {
+    const health = {
+        status: 'OK',
+        timestamp: new Date().toISOString(),
+        uptime: process.uptime(),
+        environment: NODE_ENV,
+        port: PORT,
+        database: dbInitialized ? 'Connected' : 'Not Connected',
+        blockchain: blockchainInitialized ? 'Connected' : 'Not Connected'
+    };
+    
+    res.status(200).json(health);
+});
+
 // Initialize SQLite database
 let db = null;
 let dbInitialized = false;
