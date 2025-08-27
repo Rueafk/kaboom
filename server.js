@@ -761,6 +761,16 @@ app.post('/api/blockchain/force-sync', async (req, res) => {
 
 // Enable blockchain storage
 app.post('/api/blockchain/enable', async (req, res) => {
+    // Set CORS headers explicitly
+    res.header('Access-Control-Allow-Origin', '*');
+    res.header('Access-Control-Allow-Methods', 'POST, OPTIONS');
+    res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+    
+    // Handle preflight requests
+    if (req.method === 'OPTIONS') {
+        return res.status(200).end();
+    }
+    
     try {
         if (!blockchainInitialized || !blockchainManager) {
             return res.status(503).json({ error: 'Blockchain service not available' });
@@ -776,6 +786,16 @@ app.post('/api/blockchain/enable', async (req, res) => {
 
 // Disable blockchain storage
 app.post('/api/blockchain/disable', async (req, res) => {
+    // Set CORS headers explicitly
+    res.header('Access-Control-Allow-Origin', '*');
+    res.header('Access-Control-Allow-Methods', 'POST, OPTIONS');
+    res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+    
+    // Handle preflight requests
+    if (req.method === 'OPTIONS') {
+        return res.status(200).end();
+    }
+    
     try {
         if (!blockchainInitialized || !blockchainManager) {
             return res.status(503).json({ error: 'Blockchain service not available' });
@@ -791,6 +811,16 @@ app.post('/api/blockchain/disable', async (req, res) => {
 
 // Clear sync queue
 app.post('/api/blockchain/clear-queue', async (req, res) => {
+    // Set CORS headers explicitly
+    res.header('Access-Control-Allow-Origin', '*');
+    res.header('Access-Control-Allow-Methods', 'POST, OPTIONS');
+    res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+    
+    // Handle preflight requests
+    if (req.method === 'OPTIONS') {
+        return res.status(200).end();
+    }
+    
     try {
         if (!blockchainInitialized || !blockchainManager) {
             return res.status(503).json({ error: 'Blockchain service not available' });
