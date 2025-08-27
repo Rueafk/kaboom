@@ -428,7 +428,10 @@ app.get('/api/players', async (req, res) => {
 
 // Save player data
 app.post('/api/players', async (req, res) => {
+    console.log('📝 Save player request received:', req.body);
+    
     if (!dbInitialized) {
+        console.log('⚠️ Database not initialized, returning fallback response');
         return res.json({
             success: true,
             message: 'Player data saved successfully (fallback mode)',
@@ -440,8 +443,11 @@ app.post('/api/players', async (req, res) => {
         const playerData = req.body;
         
         if (!playerData.wallet_address) {
+            console.log('❌ Missing wallet address in request');
             return res.status(400).json({ error: 'Wallet address is required' });
         }
+        
+        console.log(`💾 Saving player data for wallet: ${playerData.wallet_address}`);
         
         const query = `
             INSERT OR REPLACE INTO players (
@@ -478,16 +484,21 @@ app.post('/api/players', async (req, res) => {
                 return res.status(500).json({ error: err.message });
             }
             
+            console.log(`✅ Player data saved to database. ID: ${this.lastID}, Wallet: ${playerData.wallet_address}`);
+            
             // Also store on blockchain if available
             let blockchainResult = null;
             if (blockchainInitialized && blockchainManager) {
                 try {
+                    console.log('🔗 Attempting to store on blockchain...');
                     blockchainResult = await blockchainManager.storePlayerProfile(playerData);
                     console.log('🔗 Player data also stored on blockchain:', blockchainResult);
                 } catch (blockchainError) {
                     console.error('❌ Error storing on blockchain:', blockchainError);
                     blockchainResult = { error: blockchainError.message };
                 }
+            } else {
+                console.log('⚠️ Blockchain not available for storage');
             }
             
             res.json({
@@ -540,7 +551,10 @@ app.get('/api/players/:walletAddress', async (req, res) => {
 
 // Start game session
 app.post('/api/sessions/start', async (req, res) => {
+    console.log('🎮 Start session request received:', req.body);
+    
     if (!dbInitialized) {
+        console.log('⚠️ Database not initialized, returning fallback response');
         return res.json({
             success: true,
             session_id: req.body.session_id || Date.now().toString(),
@@ -552,8 +566,11 @@ app.post('/api/sessions/start', async (req, res) => {
         const { wallet_address, session_id } = req.body;
         
         if (!wallet_address || !session_id) {
+            console.log('❌ Missing wallet address or session ID in request');
             return res.status(400).json({ error: 'Wallet address and session ID are required' });
         }
+        
+        console.log(`🎮 Starting session for wallet: ${wallet_address}, Session ID: ${session_id}`);
         
         const query = `INSERT INTO game_sessions (wallet_address, session_id) VALUES (?, ?)`;
         
@@ -562,6 +579,8 @@ app.post('/api/sessions/start', async (req, res) => {
                 console.error('❌ Error starting session:', err);
                 return res.status(500).json({ error: err.message });
             }
+            
+            console.log(`✅ Session started successfully. ID: ${this.lastID}, Wallet: ${wallet_address}`);
             
             res.json({
                 success: true,

@@ -3,12 +3,17 @@ const BlockchainService = require('./blockchain-service');
 class BlockchainDataManager {
     constructor() {
         this.blockchainService = new BlockchainService();
-        this.isEnabled = process.env.ENABLE_BLOCKCHAIN === 'true' || false;
+        
+        // Force enable in production, check env var in development
+        const isProduction = process.env.NODE_ENV === 'production';
+        this.isEnabled = isProduction ? true : (process.env.ENABLE_BLOCKCHAIN === 'true' || false);
+        
         this.fallbackToLocal = true;
         this.syncQueue = [];
         this.isProcessingQueue = false;
         
-        console.log(`🔗 Blockchain Data Manager initialized - Enabled: ${this.isEnabled}`);
+        console.log(`🔗 Blockchain Data Manager initialized - Enabled: ${this.isEnabled} (Production: ${isProduction})`);
+        console.log(`🔗 Environment: NODE_ENV=${process.env.NODE_ENV}, ENABLE_BLOCKCHAIN=${process.env.ENABLE_BLOCKCHAIN}`);
     }
     
     // Store player profile on blockchain
