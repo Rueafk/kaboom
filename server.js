@@ -747,6 +747,50 @@ app.post('/api/blockchain/force-sync', async (req, res) => {
     }
 });
 
+// Enable blockchain storage
+app.post('/api/blockchain/enable', async (req, res) => {
+    try {
+        if (!blockchainInitialized || !blockchainManager) {
+            return res.status(503).json({ error: 'Blockchain service not available' });
+        }
+        
+        blockchainManager.setEnabled(true);
+        console.log('✅ Blockchain storage enabled via admin dashboard');
+        res.json({ success: true, message: 'Blockchain storage enabled' });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Disable blockchain storage
+app.post('/api/blockchain/disable', async (req, res) => {
+    try {
+        if (!blockchainInitialized || !blockchainManager) {
+            return res.status(503).json({ error: 'Blockchain service not available' });
+        }
+        
+        blockchainManager.setEnabled(false);
+        console.log('⚠️ Blockchain storage disabled via admin dashboard');
+        res.json({ success: true, message: 'Blockchain storage disabled' });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Clear sync queue
+app.post('/api/blockchain/clear-queue', async (req, res) => {
+    try {
+        if (!blockchainInitialized || !blockchainManager) {
+            return res.status(503).json({ error: 'Blockchain service not available' });
+        }
+        
+        blockchainManager.clearSyncQueue();
+        res.json({ success: true, message: 'Sync queue cleared' });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
 // Simple health check for deployment
 app.get('/api/health', (req, res) => {
     res.json({ 

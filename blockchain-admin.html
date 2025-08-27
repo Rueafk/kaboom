@@ -589,8 +589,17 @@
         async function clearQueue() {
             if (confirm('Are you sure you want to clear the sync queue? This will remove all pending items.')) {
                 try {
-                    // Note: This would need to be implemented on the server side
-                    alert('⚠️ Clear queue functionality not implemented yet');
+                    const response = await fetch(`${API_BASE}/blockchain/clear-queue`, {
+                        method: 'POST'
+                    });
+                    const result = await response.json();
+                    
+                    if (result.success) {
+                        alert('✅ Sync queue cleared successfully');
+                        checkQueueStatus();
+                    } else {
+                        alert('❌ Error clearing queue: ' + result.error);
+                    }
                 } catch (error) {
                     alert('❌ Error: ' + error.message);
                 }
@@ -600,9 +609,17 @@
         async function enableBlockchain() {
             if (confirm('Enable blockchain storage? This will start storing player data on the Solana blockchain.')) {
                 try {
-                    // Note: This would need to be implemented on the server side
-                    alert('⚠️ Enable/disable functionality not implemented yet');
-                    checkBlockchainStatus();
+                    const response = await fetch(`${API_BASE}/blockchain/enable`, {
+                        method: 'POST'
+                    });
+                    const result = await response.json();
+                    
+                    if (result.success) {
+                        alert('✅ Blockchain storage enabled successfully');
+                        checkBlockchainStatus();
+                    } else {
+                        alert('❌ Error enabling blockchain: ' + result.error);
+                    }
                 } catch (error) {
                     alert('❌ Error: ' + error.message);
                 }
@@ -612,9 +629,17 @@
         async function disableBlockchain() {
             if (confirm('Disable blockchain storage? This will stop storing player data on the blockchain.')) {
                 try {
-                    // Note: This would need to be implemented on the server side
-                    alert('⚠️ Enable/disable functionality not implemented yet');
-                    checkBlockchainStatus();
+                    const response = await fetch(`${API_BASE}/blockchain/disable`, {
+                        method: 'POST'
+                    });
+                    const result = await response.json();
+                    
+                    if (result.success) {
+                        alert('⚠️ Blockchain storage disabled successfully');
+                        checkBlockchainStatus();
+                    } else {
+                        alert('❌ Error disabling blockchain: ' + result.error);
+                    }
                 } catch (error) {
                     alert('❌ Error: ' + error.message);
                 }
