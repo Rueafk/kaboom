@@ -5,6 +5,8 @@ env:
     value: production
   - name: PORT
     value: 8000
+  - name: ENABLE_BLOCKCHAIN
+    value: true
 build:
   builder: nodejs
   buildCommand: npm install
