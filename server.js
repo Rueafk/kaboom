@@ -113,8 +113,7 @@ app.use(express.static('.', {
         } else if (path.endsWith('.woff2') || path.endsWith('.woff')) {
             res.setHeader('Content-Type', 'font/woff2');
         }
-    },
-    fallthrough: false // Don't fall through to next middleware if file not found
+    }
 }));
 
 // Handle missing assets gracefully
