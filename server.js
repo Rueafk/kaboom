@@ -15,7 +15,7 @@ const NODE_ENV = process.env.NODE_ENV || 'development';
 
 // Enhanced middleware with security
 const allowedOrigins = NODE_ENV === 'production' 
-    ? ['https://kaboom-game.koyeb.app', 'https://kaboom-game-rueafk.koyeb.app', 'https://favourable-elicia-afk-a1f42961.koyeb.app']
+    ? ['https://kaboom-game.koyeb.app', 'https://kaboom-game-rueafk.koyeb.app', 'https://favourable-elicia-afk-a1f42961.koyeb.app', 'https://*.koyeb.app']
     : ['http://localhost:3000', 'http://127.0.0.1:3000', 'http://localhost:8000', 'http://127.0.0.1:8000', 'null', 'file://'];
 
 app.use(cors({
@@ -29,7 +29,11 @@ app.use(cors({
         console.log(`🔗 CORS: Checking origin: ${origin}`);
         console.log(`🔗 CORS: Allowed origins: ${JSON.stringify(allowedOrigins)}`);
         
-        if (allowedOrigins.indexOf(origin) !== -1) {
+        // In production, allow all koyeb.app subdomains
+        if (NODE_ENV === 'production' && origin.includes('koyeb.app')) {
+            console.log(`🔗 CORS: Production - allowing koyeb.app origin: ${origin}`);
+            callback(null, true);
+        } else if (allowedOrigins.indexOf(origin) !== -1) {
             console.log(`🔗 CORS: Origin ${origin} is allowed`);
             callback(null, true);
         } else {
