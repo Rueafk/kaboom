@@ -154,8 +154,162 @@ function initializeDatabase() {
                 )`);
                 
                 console.log('✅ Database tables created');
-                dbInitialized = true;
-                resolve(true);
+                
+                // Initialize with real player data if database is empty
+                initializeRealPlayerData().then(() => {
+                    dbInitialized = true;
+                    resolve(true);
+                }).catch(err => {
+                    console.error('❌ Error initializing real player data:', err);
+                    dbInitialized = true;
+                    resolve(true); // Continue even if initialization fails
+                });
+            });
+        });
+    });
+}
+
+// Initialize real player data if database is empty
+async function initializeRealPlayerData() {
+    return new Promise((resolve, reject) => {
+        // Check if database is empty
+        db.get('SELECT COUNT(*) as count FROM players', (err, row) => {
+            if (err) {
+                console.error('❌ Error checking player count:', err);
+                reject(err);
+                return;
+            }
+            
+            if (row.count > 0) {
+                console.log(`📊 Database already has ${row.count} players, skipping initialization`);
+                resolve();
+                return;
+            }
+            
+            console.log('📊 Database is empty, initializing with real player data...');
+            
+            // Real player data from the original database
+            const realPlayers = [
+                {
+                    wallet_address: '5u4iU6mN2fWKbD8pCNizvtdFYSSxubcgKZh5Szf5ziKv',
+                    username: 'Kaboom_5u4iU6',
+                    level: 1,
+                    total_score: 55900,
+                    boom_tokens: 5590,
+                    lives: 3,
+                    current_score: 0,
+                    experience_points: 0,
+                    achievements_unlocked: 0,
+                    total_playtime_minutes: 0,
+                    games_played: 0,
+                    games_won: 0,
+                    highest_level_reached: 1,
+                    longest_survival_time: 0,
+                    total_enemies_killed: 0,
+                    total_bombs_used: 0
+                },
+                {
+                    wallet_address: '7hFiL6Y38Tki9nynsLZSzqMMABJ9phKxZBXYeshZiz8h',
+                    username: 'Kaboom_7hFiL6',
+                    level: 1,
+                    total_score: 2700,
+                    boom_tokens: 270,
+                    lives: 3,
+                    current_score: 0,
+                    experience_points: 0,
+                    achievements_unlocked: 0,
+                    total_playtime_minutes: 0,
+                    games_played: 0,
+                    games_won: 0,
+                    highest_level_reached: 1,
+                    longest_survival_time: 0,
+                    total_enemies_killed: 0,
+                    total_bombs_used: 0
+                },
+                {
+                    wallet_address: '6vQ3yxe3a6aTdKce89wLZBgKgLAtahw5VWdQRG8bDvqg',
+                    username: 'Kaboom_6vQ3yx',
+                    level: 1,
+                    total_score: 0,
+                    boom_tokens: 0,
+                    lives: 3,
+                    current_score: 0,
+                    experience_points: 0,
+                    achievements_unlocked: 0,
+                    total_playtime_minutes: 0,
+                    games_played: 0,
+                    games_won: 0,
+                    highest_level_reached: 1,
+                    longest_survival_time: 0,
+                    total_enemies_killed: 0,
+                    total_bombs_used: 0
+                },
+                {
+                    wallet_address: '6M7kt5t235PneqWNFfpS2CA2UAy7KUndZ5dn2MwUJwdS',
+                    username: 'Kaboom_6M7kt5',
+                    level: 4,
+                    total_score: 5400,
+                    boom_tokens: 540,
+                    lives: 1,
+                    current_score: 5400,
+                    experience_points: 0,
+                    achievements_unlocked: 0,
+                    total_playtime_minutes: 0,
+                    games_played: 0,
+                    games_won: 0,
+                    highest_level_reached: 4,
+                    longest_survival_time: 0,
+                    total_enemies_killed: 0,
+                    total_bombs_used: 0
+                }
+            ];
+            
+            // Insert real players
+            let insertedCount = 0;
+            realPlayers.forEach((player, index) => {
+                const query = `
+                    INSERT INTO players (
+                        wallet_address, username, level, total_score, boom_tokens, lives,
+                        current_score, experience_points, achievements_unlocked,
+                        total_playtime_minutes, games_played, games_won,
+                        highest_level_reached, longest_survival_time,
+                        total_enemies_killed, total_bombs_used
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                `;
+                
+                const params = [
+                    player.wallet_address,
+                    player.username,
+                    player.level,
+                    player.total_score,
+                    player.boom_tokens,
+                    player.lives,
+                    player.current_score,
+                    player.experience_points,
+                    player.achievements_unlocked,
+                    player.total_playtime_minutes,
+                    player.games_played,
+                    player.games_won,
+                    player.highest_level_reached,
+                    player.longest_survival_time,
+                    player.total_enemies_killed,
+                    player.total_bombs_used
+                ];
+                
+                db.run(query, params, function(err) {
+                    if (err) {
+                        console.error(`❌ Error inserting player ${player.username}:`, err);
+                    } else {
+                        insertedCount++;
+                        console.log(`✅ Inserted player: ${player.username} (${player.wallet_address.substring(0, 8)}...)`);
+                    }
+                    
+                    // Check if all players have been processed
+                    if (insertedCount === realPlayers.length) {
+                        console.log(`🎉 Successfully initialized database with ${insertedCount} real players`);
+                        resolve();
+                    }
+                });
             });
         });
     });
